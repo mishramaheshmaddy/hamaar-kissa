@@ -1,0 +1,740 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 1.0.0
+servers:
+  - url: /api
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /stats:
+    get:
+      operationId: getStats
+      summary: Dashboard statistics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /categories:
+    get:
+      operationId: listCategories
+      summary: List all categories
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /categories/{id}:
+    get:
+      operationId: getCategory
+      summary: Get a category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateCategory
+      summary: Update a category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteCategory
+      summary: Delete a category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No content
+
+  /audio-stories:
+    get:
+      operationId: listAudioStories
+      summary: List audio stories
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: published
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AudioStory"
+    post:
+      operationId: createAudioStory
+      summary: Create an audio story
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioStoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioStory"
+
+  /audio-stories/{id}:
+    get:
+      operationId: getAudioStory
+      summary: Get an audio story
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioStory"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateAudioStory
+      summary: Update an audio story
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioStoryUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioStory"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAudioStory
+      summary: Delete an audio story
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No content
+
+  /videos:
+    get:
+      operationId: listVideos
+      summary: List videos
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: published
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Video"
+    post:
+      operationId: createVideo
+      summary: Create a video
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Video"
+
+  /videos/{id}:
+    get:
+      operationId: getVideo
+      summary: Get a video
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Video"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateVideo
+      summary: Update a video
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Video"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteVideo
+      summary: Delete a video
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: No content
+
+  /media/youtube-info:
+    post:
+      operationId: fetchYoutubeInfo
+      summary: Fetch metadata from a YouTube URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YoutubeInfoRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YoutubeInfo"
+        "400":
+          description: Invalid URL
+
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. The client sends JSON
+        metadata here, then uploads the file directly to the returned URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+      description: |
+        Unconditionally public — no authentication or ACL checks.
+        Searches PUBLIC_OBJECT_SEARCH_PATHS for the given file path.
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relative file path within the public search paths.
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to serve public object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      description: |
+        Serves object entities uploaded via presigned URLs. These can optionally
+        be protected with authentication or ACL checks based on the use case.
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Object path within the private object dir (e.g. `uploads/some-uuid`).
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Object not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to serve object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    Stats:
+      type: object
+      required: [totalCategories, totalAudioStories, totalVideos, publishedAudioStories, publishedVideos]
+      properties:
+        totalCategories:
+          type: integer
+        totalAudioStories:
+          type: integer
+        totalVideos:
+          type: integer
+        publishedAudioStories:
+          type: integer
+        publishedVideos:
+          type: integer
+
+    Category:
+      type: object
+      required: [id, name, label, icon, type, sortOrder, active, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+        type:
+          type: string
+        sortOrder:
+          type: integer
+        active:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    CategoryInput:
+      type: object
+      required: [name, label, icon, type]
+      properties:
+        name:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+        type:
+          type: string
+        sortOrder:
+          type: integer
+        active:
+          type: boolean
+
+    CategoryUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+        type:
+          type: string
+        sortOrder:
+          type: integer
+        active:
+          type: boolean
+
+    AudioStory:
+      type: object
+      required: [id, title, categoryId, narrator, durationSeconds, description, thumbnailUrl, audioUrl, sourceType, published, sortOrder, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
+        narrator:
+          type: string
+        durationSeconds:
+          type: integer
+        description:
+          type: string
+        thumbnailUrl:
+          type: ["string", "null"]
+        audioUrl:
+          type: string
+        sourceType:
+          type: string
+        published:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    AudioStoryInput:
+      type: object
+      required: [title, narrator, durationSeconds, description, audioUrl, sourceType]
+      properties:
+        title:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        narrator:
+          type: string
+        durationSeconds:
+          type: integer
+        description:
+          type: string
+        thumbnailUrl:
+          type: ["string", "null"]
+        audioUrl:
+          type: string
+        sourceType:
+          type: string
+        published:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    AudioStoryUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        narrator:
+          type: string
+        durationSeconds:
+          type: integer
+        description:
+          type: string
+        thumbnailUrl:
+          type: ["string", "null"]
+        audioUrl:
+          type: string
+        sourceType:
+          type: string
+        published:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    Video:
+      type: object
+      required: [id, title, categoryId, description, thumbnailUrl, videoUrl, sourceType, youtubeId, views, published, sortOrder, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        categoryName:
+          type: ["string", "null"]
+        description:
+          type: string
+        thumbnailUrl:
+          type: ["string", "null"]
+        videoUrl:
+          type: string
+        sourceType:
+          type: string
+        youtubeId:
+          type: ["string", "null"]
+        views:
+          type: integer
+        published:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    VideoInput:
+      type: object
+      required: [title, description, videoUrl, sourceType]
+      properties:
+        title:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        description:
+          type: string
+        thumbnailUrl:
+          type: ["string", "null"]
+        videoUrl:
+          type: string
+        sourceType:
+          type: string
+        youtubeId:
+          type: ["string", "null"]
+        views:
+          type: integer
+        published:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    VideoUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        categoryId:
+          type: ["integer", "null"]
+        description:
+          type: string
+        thumbnailUrl:
+          type: ["string", "null"]
+        videoUrl:
+          type: string
+        sourceType:
+          type: string
+        youtubeId:
+          type: ["string", "null"]
+        views:
+          type: integer
+        published:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    YoutubeInfoRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+
+    YoutubeInfo:
+      type: object
+      required: [title, thumbnailUrl, youtubeId, description, duration]
+      properties:
+        title:
+          type: string
+        thumbnailUrl:
+          type: string
+        youtubeId:
+          type: string
+        description:
+          type: string
+        duration:
+          type: integer
+        authorName:
+          type: string
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Original file name.
+        size:
+          type: integer
+          minimum: 1
+          description: File size in bytes.
+        contentType:
+          type: string
+          minLength: 1
+          description: MIME type of the file (e.g. `image/jpeg`).
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+          description: Presigned GCS URL for PUT upload.
+        objectPath:
+          type: string
+          description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

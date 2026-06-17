@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "Hamaar Kissa",
+    "slug": "hamaar-kissa",
+    "version": "1.0.3",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "haamarkissa",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E8530A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.haamarkissa.app"
+    },
+    "android": {
+      "package": "com.haamarkissa.app",
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#E8530A"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/logo.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b3606548-d7c0-43ee-9c4f-8b83b34324c4"
+      }
+    },
+    "owner": "maheshmishra"
+  }
+}
