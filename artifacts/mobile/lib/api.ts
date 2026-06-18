@@ -1,9 +1,6 @@
-const FALLBACK_BASE = "https://bhojpuri-beats--maheshgkp.replit.app";
+const FALLBACK_BASE = "https://hamaar-kissa-api.onrender.com";
 
 function getBase() {
-  if (typeof window !== "undefined" && window.location?.hostname) {
-    return `https://${window.location.hostname}`;
-  }
   const envDomain = process.env["EXPO_PUBLIC_DOMAIN"];
   if (envDomain) {
     return `https://${envDomain}`;
