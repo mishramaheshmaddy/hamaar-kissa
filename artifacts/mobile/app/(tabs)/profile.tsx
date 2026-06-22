@@ -17,6 +17,7 @@ import AudioCard from "@/components/AudioCard";
 import MiniPlayer from "@/components/MiniPlayer";
 import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
 import { useRouter } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
 
 const logo = require("@/assets/images/logo.png");
 
@@ -34,13 +35,6 @@ function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory 
     audioUrl: `${BASE}${s.audioUrl}`,
   };
 }
-
-const DUMMY_USER = {
-  name: "महेश कुमार",
-  username: "@mahesh_bhojpuri",
-  memberSince: "मई 2024",
-  location: "गोरखपुर, उत्तर प्रदेश",
-};
 
 const SETTINGS = [
   {
@@ -86,10 +80,16 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { savedStories, likedStories, history, playStory, currentStory, isPlaying, sleepTimerMinutes } = useAudio();
+  const { user, token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"saved" | "liked" | "history">("saved");
   const [allStories, setAllStories] = useState<AudioStory[]>([]);
+  const [mySubmissions, setMySubmissions] = useState<Array<{ id: number; title: string; status: string; createdAt: string }>>([]);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+
+  const displayName = user?.name || user?.phone || "महेश बाहिन";
+  const firstLetter = displayName.charAt(0).toUpperCase();
+  const joinedSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("hi-IN") : "मई 2024";
 
   useEffect(() => {
     (async () => {
@@ -104,6 +104,21 @@ export default function ProfileScreen() {
       } catch {}
     })();
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE}/api/submissions/my`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMySubmissions(data.submissions || []);
+        }
+      } catch {}
+    })();
+  }, [token]);
 
   const savedItems = allStories.filter((s) => savedStories.includes(s.id));
   const likedItems = allStories.filter((s) => likedStories.includes(s.id));
@@ -124,14 +139,14 @@ export default function ProfileScreen() {
             <Image source={logo} style={styles.logoImg} contentFit="contain" />
           </View>
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>म</Text>
+            <Text style={styles.avatarText}>{firstLetter}</Text>
           </View>
-          <Text style={[styles.name, { color: colors.foreground }]}>{DUMMY_USER.name}</Text>
-          <Text style={[styles.username, { color: colors.primary }]}>{DUMMY_USER.username}</Text>
+          <Text style={[styles.name, { color: colors.foreground }]}>{displayName}</Text>
+          <Text style={[styles.username, { color: colors.primary }]}>{user?.phone || "@hamaarkissa_user"}</Text>
           <View style={styles.metaRow}>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>📍 {DUMMY_USER.location}</Text>
+            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>📍 {user?.location || "भोजपुरी"}</Text>
             <Text style={[styles.metaDot, { color: colors.mutedForeground }]}>•</Text>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>🗓 {DUMMY_USER.memberSince} से</Text>
+            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>🗓 {joinedSince} से</Text>
           </View>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -249,7 +264,11 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: "#E74C3C" }]}
-          onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await logout();
+            router.replace("/" as any);
+          }}
         >
           <Text style={{ color: "#E74C3C", fontWeight: "700", fontSize: 15 }}>🚪 साइन आउट</Text>
         </TouchableOpacity>

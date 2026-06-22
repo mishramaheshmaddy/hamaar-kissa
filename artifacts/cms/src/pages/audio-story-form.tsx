@@ -45,7 +45,7 @@ export default function AudioStoryForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: story, isLoading } = useGetAudioStory(id!, { query: { enabled: !!id } });
+  const { data: story, isLoading } = useGetAudioStory(id!, { query: { enabled: !!id, queryKey: ["audio-story", id!] } });
   const { data: categoriesRaw } = useListCategories({});
   const categories = categoriesRaw?.filter((c) => c.type === "audio" || c.type === "both");
   

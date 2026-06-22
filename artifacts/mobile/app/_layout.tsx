@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AudioProvider } from "@/context/AudioContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { Platform } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
@@ -40,6 +41,14 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="category/[id]"
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="login"
+        options={{ headerShown: false, presentation: "modal" }}
+      />
+      <Stack.Screen
+        name="share"
         options={{ headerShown: false }}
       />
     </Stack>
@@ -68,11 +77,13 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AudioProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
+            <AuthProvider>
+              <GestureHandlerRootView>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </AuthProvider>
           </AudioProvider>
         </QueryClientProvider>
       </ErrorBoundary>

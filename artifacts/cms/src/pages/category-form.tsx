@@ -34,7 +34,7 @@ export default function CategoryForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: category, isLoading } = useGetCategory(id!, { query: { enabled: !!id } });
+  const { data: category, isLoading } = useGetCategory(id!, { query: { enabled: !!id, queryKey: ["category", id!] } });
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
 

@@ -5,7 +5,7 @@
     "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "haamarkissa",
+    "scheme": "hamaarkissa",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

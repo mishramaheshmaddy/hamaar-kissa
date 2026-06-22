@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch, ApiCategory } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
@@ -28,6 +29,7 @@ export default function UploadScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { token, user } = useAuth();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const audioInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -160,6 +162,11 @@ export default function UploadScreen() {
   };
 
   const handleSubmit = async () => {
+    if (!user) {
+      Alert.alert("लॉगिन चाहीं", "अपनी कहानी अपलोड करे के लिए लॉगिन करीं।");
+      router.push("/login" as any);
+      return;
+    }
     if (!title.trim()) { Alert.alert("जरूरी", "शीर्षक दर्ज करीं।"); return; }
     if (!description.trim()) { Alert.alert("जरूरी", "विवरण दर्ज करीं।"); return; }
     if (!categoryId) { Alert.alert("जरूरी", "श्रेणी चुनीं।"); return; }
@@ -170,22 +177,25 @@ export default function UploadScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      await fetch(`${BASE}/api/audio-stories`, {
+      const res = await fetch(`${BASE}/api/submissions/audio`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
           categoryId,
           audioUrl,
           thumbnailUrl: thumbnailUrl ?? "",
-          narrator: "श्रोता",
-          durationSeconds: 0,
-          sourceType: "upload",
-          published: false,
-          sortOrder: 0,
         }),
       });
+      if (!res.ok) {
+        const err = await res.text();
+        Alert.alert("विफल", `सबमिशन निष्फल: ${err.slice(0, 100)}`);
+        return;
+      }
       setSuccess(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {

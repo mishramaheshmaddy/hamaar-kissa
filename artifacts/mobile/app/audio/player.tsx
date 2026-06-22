@@ -105,15 +105,12 @@ async function handleShare() {
   try {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    const webUrl = `${BASE}/share/audio/${currentStory!.id}`;
     const shareContent: Parameters<typeof Share.share>[0] = {
       title: currentStory!.title,
-      message: `🎙️ ${currentStory!.title}\nसुनावत बाड़े: ${currentStory!.narrator}\n\nHamaar Kissa पर सुनीं!${fullAudioUrl ? `\n${fullAudioUrl}` : ""}`,
+      message: `🎙️ ${currentStory!.title}\nसुनावत बाड़े: ${currentStory!.narrator}\n\nHamaar Kissa पर सुनीं!\n${webUrl}`,
+      url: Platform.OS === "ios" ? webUrl : undefined,
     };
-
-    if (Platform.OS === "ios" && fullAudioUrl) {
-      (shareContent as any).url = fullAudioUrl;
-    }
-
     await Share.share(shareContent);
   } catch (_e) {
     // User cancelled — no-op

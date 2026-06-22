@@ -23,6 +23,7 @@ import { apiFetch, ApiAudioStory, ApiVideo, ApiCategory, BASE } from "@/lib/api"
 import { AudioStory } from "@/context/AudioContext";
 import { VideoItem } from "@/data/mockData";
 import { CATEGORY_ICONS as VIDEO_CATEGORY_ICONS } from "@/components/VideoCard";
+import { useAuth } from "@/context/AuthContext";
 
 const logo = require("@/assets/images/logo.png");
 
@@ -59,15 +60,37 @@ function mapVideo(v: ApiVideo, catMap: Record<number, string>): VideoItem {
   };
 }
 
+interface HomeSectionItem {
+  id: number;
+  title: string;
+  subtitle: string;
+  type: string;
+  contentSource: string;
+  categoryId: number | null;
+  sortOrder: number;
+  isActive: boolean;
+  items: Array<{
+    id: number;
+    title: string;
+    categoryName?: string | null;
+    narrator?: string;
+    durationSeconds?: number;
+    thumbnailUrl?: string | null;
+    audioUrl?: string;
+    videoUrl?: string;
+    type: string;
+  }>;
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { playStory, currentStory, isPlaying } = useAudio();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [allStories, setAllStories] = useState<AudioStory[]>([]);
-  const [allVideos, setAllVideos] = useState<VideoItem[]>([]);
+  const [sections, setSections] = useState<HomeSectionItem[]>([]);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,18 +100,12 @@ export default function HomeScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const [rawStories, rawVideos, allCats] = await Promise.all([
-          apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-          apiFetch<ApiVideo[]>("/api/videos?published=true"),
+        const [homeSections, allCats] = await Promise.all([
+          apiFetch<HomeSectionItem[]>("/api/home-sections"),
           apiFetch<ApiCategory[]>("/api/categories"),
         ]);
         if (cancelled) return;
-
-        const catMap: Record<number, string> = {};
-        for (const c of allCats) catMap[c.id] = c.name;
-
-        setAllStories(rawStories.map((s) => mapStory(s, catMap)));
-        setAllVideos(rawVideos.map((v) => mapVideo(v, catMap)));
+        setSections(homeSections);
         setCategories(allCats);
       } catch (_e) {
       } finally {
@@ -98,16 +115,71 @@ export default function HomeScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  const query = searchQuery.toLowerCase();
-  const filteredStories = query
-    ? allStories.filter((s) => s.title.toLowerCase().includes(query) || s.narrator.toLowerCase().includes(query))
-    : allStories;
+  const renderSection = (section: HomeSectionItem) => {
+    const items = section.items || [];
+    if (items.length === 0) return null;
 
-  const trendingStories = filteredStories.slice(0, 6);
-  const newStories = [...filteredStories].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 6);
-  const devotionalStories = allStories.filter((s) => s.category === "devotional");
-  const horrorStories = allStories.filter((s) => s.category === "horror");
-  const trendingVideos = allVideos.slice(0, 4);
+    if (section.type === "video" || (section.type === "both" && items[0]?.type === "video")) {
+      return (
+        <View style={{ marginTop: 24 }}>
+          <SectionHeader title={section.title} onSeeAll={() => router.push("/(tabs)/video")} />
+          <FlatList
+            data={items}
+            keyExtractor={(item) => String(item.id)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/video")}
+                style={[styles.videoThumb, { backgroundColor: "#1C1208" }]}
+              >
+                <Text style={styles.videoThumbIcon}>
+                  {VIDEO_CATEGORY_ICONS[item.categoryName ?? "other"] ?? "🎬"}
+                </Text>
+                <View style={styles.videoOverlay} />
+                <View style={styles.videoInfo}>
+                  <Text style={styles.videoTitle} numberOfLines={2}>{item.title}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ marginTop: 24 }}>
+        <SectionHeader title={section.title} onSeeAll={() => router.push("/(tabs)/audio")} />
+        <FlatList
+          data={items}
+          keyExtractor={(item) => String(item.id)}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => {
+            const story: AudioStory = {
+              id: String(item.id),
+              title: item.title,
+              category: item.categoryName ?? "other",
+              duration: item.durationSeconds ?? 0,
+              thumbnail: item.thumbnailUrl ? (item.thumbnailUrl.startsWith("/") ? `${BASE}${item.thumbnailUrl}` : item.thumbnailUrl) : "",
+              narrator: item.narrator ?? "",
+              description: "",
+              audioUrl: item.audioUrl ? (item.audioUrl.startsWith("/") ? `${BASE}${item.audioUrl}` : item.audioUrl) : undefined,
+            };
+            return (
+              <AudioCard
+                story={story}
+                onPress={() => { playStory(story); router.push("/audio/player"); }}
+                isPlaying={currentStory?.id === story.id && isPlaying}
+              />
+            );
+          }}
+        />
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -121,7 +193,13 @@ export default function HomeScreen() {
             </View>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
+              onPress={() => {
+                if (!user) router.push("/login" as any);
+                else router.push("/settings/notifications" as any);
+              }}
+            >
               <Feather name="bell" size={20} color={colors.foreground} />
             </TouchableOpacity>
           </View>
@@ -160,102 +238,10 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            {trendingStories.length > 0 && (
-              <View style={{ marginTop: 20 }}>
-                <SectionHeader title="आजु के चर्चित" onSeeAll={() => router.push("/(tabs)/audio")} />
-                <FlatList
-                  data={trendingStories}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                  renderItem={({ item }) => (
-                    <AudioCard
-                      story={item}
-                      onPress={() => { playStory(item); router.push("/audio/player"); }}
-                      isPlaying={currentStory?.id === item.id && isPlaying}
-                    />
-                  )}
-                />
-              </View>
-            )}
-
-            {trendingVideos.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader title="वायरल वीडियो" onSeeAll={() => router.push("/(tabs)/video")} />
-                <FlatList
-                  data={trendingVideos}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => router.push("/(tabs)/video")}
-                      style={[styles.videoThumb, { backgroundColor: "#1C1208" }]}
-                    >
-                      <Text style={styles.videoThumbIcon}>
-                        {VIDEO_CATEGORY_ICONS[item.category] ?? "🎬"}
-                      </Text>
-                      <View style={styles.videoOverlay} />
-                      <View style={styles.videoInfo}>
-                        <Text style={styles.videoTitle} numberOfLines={2}>{item.title}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            )}
-
-            {devotionalStories.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader title="भक्ति के कहानी" onSeeAll={() => router.push("/(tabs)/audio")} />
-                <FlatList
-                  data={devotionalStories}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                  renderItem={({ item }) => (
-                    <AudioCard story={item} onPress={() => { playStory(item); router.push("/audio/player"); }} isPlaying={currentStory?.id === item.id && isPlaying} />
-                  )}
-                />
-              </View>
-            )}
-
-            {horrorStories.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader title="भूत-प्रेत के कहानी" onSeeAll={() => router.push("/(tabs)/audio")} />
-                <FlatList
-                  data={horrorStories}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                  renderItem={({ item }) => (
-                    <AudioCard story={item} onPress={() => { playStory(item); router.push("/audio/player"); }} isPlaying={currentStory?.id === item.id && isPlaying} />
-                  )}
-                />
-              </View>
-            )}
-
-            {newStories.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader title="नया कहानी" onSeeAll={() => router.push("/(tabs)/audio")} />
-                <FlatList
-                  data={newStories}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                  renderItem={({ item }) => (
-                    <AudioCard story={item} onPress={() => { playStory(item); router.push("/audio/player"); }} isPlaying={currentStory?.id === item.id && isPlaying} />
-                  )}
-                />
-              </View>
-            )}
-
-            {trendingStories.length === 0 && trendingVideos.length === 0 && (
+            {sections.map((section) => (
+              <View key={section.id}>{renderSection(section)}</View>
+            ))}
+            {sections.length === 0 && (
               <View style={styles.empty}>
                 <Feather name="inbox" size={48} color={colors.mutedForeground} />
                 <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>

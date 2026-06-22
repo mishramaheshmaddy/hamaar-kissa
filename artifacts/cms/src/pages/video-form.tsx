@@ -45,7 +45,7 @@ export default function VideoForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: video, isLoading } = useGetVideo(id!, { query: { enabled: !!id } });
+  const { data: video, isLoading } = useGetVideo(id!, { query: { enabled: !!id, queryKey: ["video", id!] } });
   const { data: categoriesRaw } = useListCategories({});
   const categories = categoriesRaw?.filter((c) => c.type === "video" || c.type === "both");
   
