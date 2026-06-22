@@ -15,7 +15,8 @@ import { useAudio, AudioStory } from "@/context/AudioContext";
 import { useColors } from "@/hooks/useColors";
 import AudioCard from "@/components/AudioCard";
 import MiniPlayer from "@/components/MiniPlayer";
-import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
+import { apiFetch, ApiAudioStory, ApiVideo, ApiCategory, BASE } from "@/lib/api";
+import { VideoItem } from "@/data/mockData";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 
 function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory {
@@ -33,6 +34,24 @@ function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory 
   };
 }
 
+function mapVideo(v: ApiVideo, catMap: Record<number, string>): VideoItem {
+  return {
+    id: String(v.id),
+    title: v.title,
+    category: v.categoryId ? (catMap[v.categoryId] ?? "other") : "other",
+    categoryId: v.categoryId ?? undefined,
+    views: "0",
+    likes: 0,
+    creator: "",
+    thumbnail: v.thumbnailUrl ?? "",
+    duration: 0,
+    description: v.description,
+    youtubeId: v.youtubeId ?? undefined,
+    videoUrl: v.videoUrl ?? undefined,
+    sourceType: v.sourceType,
+  };
+}
+
 export default function CategoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -42,6 +61,7 @@ export default function CategoryDetailScreen() {
 
   const [category, setCategory] = useState<ApiCategory | null>(null);
   const [stories, setStories] = useState<AudioStory[]>([]);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -51,8 +71,9 @@ export default function CategoryDetailScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const [rawStories, allCats] = await Promise.all([
+        const [rawStories, rawVideos, allCats] = await Promise.all([
           apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
+          apiFetch<ApiVideo[]>("/api/videos?published=true"),
           apiFetch<ApiCategory[]>("/api/categories"),
         ]);
         if (cancelled) return;
@@ -64,10 +85,15 @@ export default function CategoryDetailScreen() {
         const cat = allCats.find((c) => c.id === numId) ?? null;
         setCategory(cat);
 
-        const filtered = rawStories
+        const filteredStories = rawStories
           .filter((s) => s.categoryId === numId)
           .map((s) => mapStory(s, catMap));
-        setStories(filtered);
+        setStories(filteredStories);
+
+        const filteredVideos = rawVideos
+          .filter((v) => v.categoryId === numId)
+          .map((v) => mapVideo(v, catMap));
+        setVideos(filteredVideos);
       } catch (_e) {
       } finally {
         if (!cancelled) setLoading(false);
@@ -81,6 +107,8 @@ export default function CategoryDetailScreen() {
   const gradient: [string, string] =
     category ? (CATEGORY_GRADIENTS[category.name] ?? ["#E8530A", "#BF360C"]) : ["#E8530A", "#BF360C"];
 
+  const totalCount = stories.length + videos.length;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPadding + 8, backgroundColor: gradient[1] }]}>
@@ -91,7 +119,7 @@ export default function CategoryDetailScreen() {
           <Text style={styles.headerIcon}>{category?.icon ?? "🎙️"}</Text>
           <Text style={styles.headerTitle}>{category?.label ?? "..."}</Text>
           <Text style={styles.headerSubtitle}>
-            {loading ? "..." : `${stories.length} कहानी`}
+            {loading ? "..." : `${totalCount} ${totalCount === 1 ? "आइटम" : "आइटम"}`}
           </Text>
         </View>
       </View>
@@ -100,14 +128,14 @@ export default function CategoryDetailScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : stories.length === 0 ? (
+      ) : totalCount === 0 ? (
         <View style={styles.center}>
           <Text style={{ fontSize: 52 }}>🎙️</Text>
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-            कवनो कहानी नइखे
+            कवनो सामग्री नइखे
           </Text>
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            CMS से इस किसिम में कहानी जोड़ीं
+            CMS से इस किसिम में कहानी या वीडियो जोड़ीं
           </Text>
           <TouchableOpacity
             style={[styles.backBtnPill, { backgroundColor: colors.primary }]}
@@ -119,11 +147,41 @@ export default function CategoryDetailScreen() {
       ) : (
         <FlatList
           data={stories}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => `story-${item.id}`}
           numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            videos.length > 0 ? (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+                  📹 वीडियो
+                </Text>
+                <FlatList
+                  data={videos}
+                  keyExtractor={(item) => `video-${item.id}`}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => router.push("/(tabs)/video")}
+                      style={[styles.videoCard, { backgroundColor: gradient[1] }]}
+                    >
+                      <Text style={styles.videoCardIcon}>🎬</Text>
+                      <Text style={styles.videoCardTitle} numberOfLines={2}>{item.title}</Text>
+                      {item.youtubeId && (
+                        <View style={styles.youtubeBadge}>
+                          <Feather name="youtube" size={12} color="#fff" />
+                          <Text style={styles.youtubeBadgeText}>YouTube</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <View style={styles.cardWrapper}>
               <AudioCard
@@ -136,6 +194,13 @@ export default function CategoryDetailScreen() {
               />
             </View>
           )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                कवनो कहानी नइखे
+              </Text>
+            </View>
+          }
         />
       )}
 
@@ -188,4 +253,11 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 140 },
   row: { gap: 12, marginBottom: 12 },
   cardWrapper: { flex: 1 },
+  sectionTitle: { fontSize: 18, fontWeight: "800", marginBottom: 12 },
+  videoCard: { width: 160, height: 200, borderRadius: 16, marginRight: 12, padding: 12, overflow: "hidden" },
+  videoCardIcon: { fontSize: 48, marginBottom: 8 },
+  videoCardTitle: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  youtubeBadge: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
+  youtubeBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  empty: { alignItems: "center", paddingTop: 40 },
 });

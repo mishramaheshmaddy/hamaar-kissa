@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
@@ -62,10 +63,10 @@ export default function MiniPlayer() {
           <Text style={styles.narrator} numberOfLines={1}>{currentStory.narrator}</Text>
         </View>
         <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); togglePlay(); }} style={styles.controlBtn}>
-          <Text style={{ fontSize: 22, color: "#fff" }}>{isPlaying ? "⏸" : "▶"}</Text>
+          <Feather name={isPlaying ? "pause" : "play"} size={22} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); stopPlayer(); }} style={styles.controlBtn}>
-          <Text style={{ fontSize: 18, color: "rgba(255,255,255,0.7)" }}>✕</Text>
+          <Feather name="x" size={18} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       </TouchableOpacity>
     </View>

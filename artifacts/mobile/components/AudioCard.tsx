@@ -1,3 +1,4 @@
+import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React from "react";
 import {
@@ -100,9 +101,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
           onPress={onPress}
           style={[styles.compactPlay, { backgroundColor: isPlaying ? colors.primary : colors.secondary }]}
         >
-          <Text style={{ fontSize: 18, color: isPlaying ? "#fff" : colors.primary }}>
-            {isPlaying ? "⏸" : "▶"}
-          </Text>
+          <Feather name={isPlaying ? "pause" : "play"} size={18} color={isPlaying ? "#fff" : colors.primary} />
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -128,7 +127,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
 
         {isPlaying && (
           <View style={[styles.nowPlaying, { backgroundColor: colors.primary }]}>
-            <Text style={{ color: "#fff", fontSize: 10 }}>▶</Text>
+            <Feather name="play" size={10} color="#fff" />
           </View>
         )}
 
@@ -155,7 +154,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
             onPress={onPress}
             style={[styles.playBtn, { backgroundColor: colors.primary }]}
           >
-            <Text style={{ color: "#fff", fontSize: 14 }}>{isPlaying ? "⏸" : "▶"}</Text>
+            <Feather name={isPlaying ? "pause" : "play"} size={14} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>

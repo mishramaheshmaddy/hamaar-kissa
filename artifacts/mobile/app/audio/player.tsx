@@ -90,7 +90,6 @@ export default function AudioPlayerScreen() {
       </View>
     );
   }
-if (!currentStory) return null;
   const gradient = CATEGORY_GRADIENTS[currentStory.category] ?? ["#E8530A", "#BF360C"];
   const icon = CATEGORY_ICONS[currentStory.category] ?? "🎙️";
   const isLiked = likedStories.includes(currentStory.id);
@@ -208,7 +207,7 @@ async function handleShare() {
             }}
             style={styles.actionBtn}
           >
-            <Text style={{ fontSize: 26 }}>{isLiked ? "❤️" : "🤍"}</Text>
+            <Feather name="heart" size={26} color={isLiked ? "#FF4444" : "#fff"} />
             <Text style={styles.actionLabel}>पसंद</Text>
           </TouchableOpacity>
 
@@ -219,17 +218,17 @@ async function handleShare() {
             }}
             style={styles.actionBtn}
           >
-            <Text style={{ fontSize: 26 }}>{isSaved ? "🔖" : "📌"}</Text>
+            <Feather name="bookmark" size={26} color={isSaved ? "#F5A623" : "#fff"} />
             <Text style={styles.actionLabel}>सेव</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
-            <Text style={{ fontSize: 26 }}>📤</Text>
+            <Feather name="share-2" size={26} color="#fff" />
             <Text style={styles.actionLabel}>शेयर</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleDownload} style={styles.actionBtn}>
-            <Text style={{ fontSize: 26 }}>⬇️</Text>
+            <Feather name="download" size={26} color="#fff" />
             <Text style={styles.actionLabel}>डाउनलोड</Text>
           </TouchableOpacity>
         </View>
@@ -271,7 +270,7 @@ async function handleShare() {
             }}
             style={styles.ctrlBtn}
           >
-            <Text style={{ fontSize: 32, color: "#fff" }}>⏮</Text>
+            <Feather name="rewind" size={32} color="#fff" />
             <Text style={styles.ctrlLabel}>10s</Text>
           </TouchableOpacity>
 
@@ -282,9 +281,7 @@ async function handleShare() {
             }}
             style={[styles.playBtn, { backgroundColor: "#fff" }]}
           >
-            <Text style={{ fontSize: 36, color: gradient[1] }}>
-              {isPlaying ? "⏸" : "▶"}
-            </Text>
+            <Feather name={isPlaying ? "pause" : "play"} size={36} color={gradient[1]} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -294,7 +291,7 @@ async function handleShare() {
             }}
             style={styles.ctrlBtn}
           >
-            <Text style={{ fontSize: 32, color: "#fff" }}>⏭</Text>
+            <Feather name="fast-forward" size={32} color="#fff" />
             <Text style={styles.ctrlLabel}>10s</Text>
           </TouchableOpacity>
         </View>

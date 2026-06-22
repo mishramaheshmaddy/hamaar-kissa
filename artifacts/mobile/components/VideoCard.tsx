@@ -108,7 +108,9 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     if (!video.videoUrl) return null;
     if (video.videoUrl.startsWith("http")) return video.videoUrl;
     // If video URL is a relative path like /api/media/files/xxx, resolve against the API base
-    return video.videoUrl;
+    const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
+    const BASE = DOMAIN ? `https://${DOMAIN}` : "";
+    return `${BASE}${video.videoUrl}`;
   };
 
   return (

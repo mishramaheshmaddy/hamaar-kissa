@@ -89,7 +89,7 @@ export default function HomeScreen() {
 
         setAllStories(rawStories.map((s) => mapStory(s, catMap)));
         setAllVideos(rawVideos.map((v) => mapVideo(v, catMap)));
-        setCategories(allCats.filter((c) => c.type === "audio" || c.type === "both"));
+        setCategories(allCats);
       } catch (_e) {
       } finally {
         if (!cancelled) setLoading(false);
