@@ -25,9 +25,9 @@ router.post("/auth/login", (req, res) => {
   res.json({ email: ADMIN_EMAIL });
 });
 
-router.get("/auth/me", (req, res) => {
+router.get("/auth/me", (req, res, next) => {
   if (!req.session.adminEmail) {
-    res.status(401).json({ error: "Not authenticated" });
+    next(); // Pass to user auth router for JWT handling
     return;
   }
   res.json({ email: req.session.adminEmail });

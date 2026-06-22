@@ -168,10 +168,10 @@ router.post("/auth/google", async (req, res) => {
   res.json({ token, user: toUserDto(user), isNewUser });
 });
 
-router.get("/auth/me", async (req, res) => {
+router.get("/auth/me", async (req, res, next) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Unauthorized" });
+    next(); // Let admin auth router handle session-based auth
     return;
   }
   const token = auth.slice(7);

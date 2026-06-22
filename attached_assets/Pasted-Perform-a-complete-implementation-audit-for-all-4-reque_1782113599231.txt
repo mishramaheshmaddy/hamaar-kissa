@@ -1,0 +1,165 @@
+Perform a complete implementation audit for all 4 requested features.
+
+Do not tell me what was coded.
+
+Instead verify what is ACTUALLY working.
+
+For each feature provide:
+
+1. Database tables created
+2. API endpoints registered and responding
+3. CMS pages working
+4. Mobile screens working
+5. Routes registered
+6. Missing functionality
+7. Runtime errors
+8. Manual configuration still required
+
+---
+
+## FEATURE 1: HOME SCREEN MANAGER
+
+Verify:
+
+* home_sections table exists
+* GET /api/home-sections works
+* GET /api/home-sections/all works
+* POST /api/home-sections works
+* PUT /api/home-sections/:id works
+* PUT /api/home-sections/reorder works
+* DELETE /api/home-sections/:id works
+
+CMS:
+
+* Home Screen appears in sidebar
+* Home Screen route loads
+* Add section works
+* Edit section works
+* Delete section works
+* Reordering works
+* Active/inactive toggle works
+
+Mobile:
+
+* Home screen loads from API
+* No hardcoded sections remain
+
+Provide proof by listing file paths and route registrations.
+
+---
+
+## FEATURE 2: USER AUTHENTICATION
+
+Verify:
+
+Database:
+
+* users table exists
+* otp_verifications table exists
+
+Backend:
+
+* POST /api/auth/send-otp responds correctly
+* POST /api/auth/verify-otp responds correctly
+* POST /api/auth/google responds correctly
+* GET /api/auth/me works
+* PUT /api/auth/profile works
+
+Authentication:
+
+* JWT generation works
+* JWT validation middleware works
+* Protected routes reject unauthenticated users
+
+Mobile:
+
+* Login screen exists
+* OTP screen exists
+* Name capture screen exists
+* AuthContext works
+* JWT stored in AsyncStorage
+* Login required before upload
+* Login required before share
+* Login required before save/download/like (if implemented)
+
+Google Login:
+
+* Fully implemented
+  OR
+* Placeholder only
+
+Clearly state which one.
+
+---
+
+## FEATURE 3: SMART SHARE + DEEP LINKING
+
+Verify:
+
+Backend:
+
+* /share/:type/:id route works
+* HTML landing page renders
+* Play Store redirect works
+
+Mobile:
+
+* hamaarkissa:// scheme registered
+* Audio deep links work
+* Video deep links work
+
+Share:
+
+* Share button generates valid URL
+* Shared URL opens correct content
+
+State whether deep linking was actually tested or only configured.
+
+---
+
+## FEATURE 4: USER AUDIO SUBMISSIONS
+
+Verify:
+
+Database:
+
+* user_submissions table exists
+
+Backend:
+
+* POST /api/submissions/audio works
+* GET /api/submissions/my works
+* GET /api/submissions/all works
+* PATCH approve works
+* PATCH reject works
+
+CMS:
+
+* User Submissions appears in sidebar
+* User Submissions page loads
+* Audio preview works
+* Approve works
+* Reject works
+
+Mobile:
+
+* Upload form exists
+* Audio picker works
+* Upload works
+* User submission history displays
+
+---
+
+## FINAL REPORT
+
+Provide:
+
+1. Features fully working
+2. Features partially implemented
+3. Features not working
+4. All runtime errors found
+5. All HTTP 500 errors found
+6. All TODOs still remaining
+7. All manual steps required before production deployment
+
+Do not claim a feature is complete unless it has been verified.
