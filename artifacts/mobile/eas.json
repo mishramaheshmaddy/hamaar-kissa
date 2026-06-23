@@ -25,7 +25,7 @@
         "EXPO_PUBLIC_DOMAIN": "hamaar-kissa-api.onrender.com"
       },
       "buildArtifactPaths": [],
-      "node": "18.0.0"
+      "node": "20.19.0"
     }
   },
   "submit": {
