@@ -3,10 +3,8 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   Platform,
   ViewToken,
@@ -42,10 +40,7 @@ export default function VideoScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [activeCategory, setActiveCategory] = useState<number | "all">("all");
-
   const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -61,11 +56,8 @@ export default function VideoScreen() {
         ]);
         if (cancelled) return;
 
-        const videoCats = allCats.filter((c) => c.type === "video" || c.type === "both");
         const catMap: Record<number, string> = {};
         for (const c of allCats) catMap[c.id] = c.name;
-
-        setCategories(videoCats);
         setVideos(rawVideos.map((v) => mapVideo(v, v.categoryId ? (catMap[v.categoryId] ?? "other") : "other")));
       } catch (_e) {
       } finally {
@@ -74,10 +66,6 @@ export default function VideoScreen() {
     })();
     return () => { cancelled = true; };
   }, []);
-
-  const filteredVideos = activeCategory === "all"
-    ? videos
-    : videos.filter((v) => v.categoryId === activeCategory);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -90,41 +78,6 @@ export default function VideoScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: "#000" }]}>
-      <View style={[styles.categoryBar, { top: topPadding + 8 }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-          <TouchableOpacity
-            onPress={() => setActiveCategory("all")}
-            style={[
-              styles.categoryPill,
-              {
-                backgroundColor: activeCategory === "all" ? "rgba(232,83,10,0.9)" : "rgba(0,0,0,0.5)",
-                borderColor: activeCategory === "all" ? "#E8530A" : "rgba(255,255,255,0.2)",
-              },
-            ]}
-          >
-            <Text style={[styles.pillText, { color: "#fff", fontWeight: activeCategory === "all" ? "700" : "500" }]}>
-              सब
-            </Text>
-          </TouchableOpacity>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => setActiveCategory(cat.id)}
-              style={[
-                styles.categoryPill,
-                {
-                  backgroundColor: activeCategory === cat.id ? "rgba(232,83,10,0.9)" : "rgba(0,0,0,0.5)",
-                  borderColor: activeCategory === cat.id ? "#E8530A" : "rgba(255,255,255,0.2)",
-                },
-              ]}
-            >
-              <Text style={[styles.pillText, { color: activeCategory === cat.id ? "#fff" : "rgba(255,255,255,0.8)", fontWeight: activeCategory === cat.id ? "700" : "500" }]}>
-                {cat.icon} {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -136,7 +89,7 @@ export default function VideoScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredVideos}
+          data={videos}
           keyExtractor={(item) => item.id}
           pagingEnabled
           showsVerticalScrollIndicator={false}
@@ -157,9 +110,6 @@ export default function VideoScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  categoryBar: { position: "absolute", left: 0, right: 0, zIndex: 10 },
-  categories: { paddingHorizontal: 12, paddingVertical: 6, gap: 8 },
-  categoryPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  pillText: { fontSize: 13 },
+
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });
