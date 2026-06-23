@@ -83,7 +83,7 @@ export default function VideoScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#E8530A" />
         </View>
-      ) : filteredVideos.length === 0 ? (
+      ) : videos.length === 0 ? (
         <View style={styles.center}>
           <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 16 }}>कवनो वीडियो ना मिलल</Text>
         </View>
