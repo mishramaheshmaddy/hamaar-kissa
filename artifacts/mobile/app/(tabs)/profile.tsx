@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import {
   ScrollView,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -266,8 +267,21 @@ export default function ProfileScreen() {
           style={[styles.logoutBtn, { borderColor: "#E74C3C" }]}
           onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await logout();
-            router.replace("/" as any);
+            Alert.alert(
+              "साइन आउट",
+              "का रउआ साइन आउट करे चाहत बानी?",
+              [
+                { text: "नाहीं", style: "cancel" },
+                {
+                  text: "हाँ, साइन आउट करीं",
+                  style: "destructive",
+                  onPress: async () => {
+                    await logout();
+                    router.replace("/(tabs)" as any);
+                  },
+                },
+              ]
+            );
           }}
         >
           <Text style={{ color: "#E74C3C", fontWeight: "700", fontSize: 15 }}>🚪 साइन आउट</Text>
