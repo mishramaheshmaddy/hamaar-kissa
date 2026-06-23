@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -84,7 +85,7 @@ export default function UploadScreen() {
     }
   };
 
-  const pickAudio = () => {
+  const pickAudio = async () => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
@@ -101,11 +102,22 @@ export default function UploadScreen() {
       };
       input.click();
     } else {
-      Alert.alert(
-        "ऑडियो अपलोड",
-        "ऑडियो अपलोड के लिए कृपया वेब ब्राउज़र में Hamaar Kissa खोलीं, या ऑडियो का URL नीचे पेस्ट करीं।",
-        [{ text: "ठीक है" }]
-      );
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: "audio/*",
+          copyToCacheDirectory: true,
+        });
+        if (result.canceled) return;
+        const asset = result.assets[0];
+        if (asset.size && asset.size > MAX_AUDIO_MB * 1024 * 1024) {
+          Alert.alert("फाइल बड़ी है", `ऑडियो ${MAX_AUDIO_MB}MB से कम होनी चाहिए।`);
+          return;
+        }
+        setAudioName(asset.name);
+        await uploadFileFromUri(asset.uri, "audioUrl");
+      } catch {
+        Alert.alert("Error", "ऑडियो pick करे में दिक्कत भइल।");
+      }
     }
   };
 
