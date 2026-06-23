@@ -1,14 +1,18 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  Share,
+  Alert,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { AudioStory } from "@/context/AudioContext";
+import { useAuth } from "@/context/AuthContext";
 import { CATEGORY_GRADIENTS } from "./CategoryColors";
 
 interface AudioCardProps {
@@ -65,10 +69,52 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export default function AudioCard({ story, onPress, isPlaying, compact }: AudioCardProps) {
   const colors = useColors();
+  const router = useRouter();
+  const { user } = useAuth();
   const gradient = CATEGORY_GRADIENTS[story.category] ?? ["#E8530A", "#BF360C"];
   const icon = CATEGORY_ICONS[story.category] ?? "🎙️";
   const displayLabel = story.categoryName ?? CATEGORY_LABEL[story.category] ?? story.category;
   const thumbUri = resolveUrl(story.thumbnail);
+
+  // Login check helper
+  const requireLogin = (action: () => void) => {
+    if (!user) {
+      Alert.alert(
+        "लॉगिन करीं 🙏",
+        "इ feature के use करे खातिर पहिले login करीं।",
+        [
+          { text: "बाद में", style: "cancel" },
+          { text: "Login करीं", onPress: () => router.push("/login" as any) },
+        ]
+      );
+      return;
+    }
+    action();
+  };
+
+  const handleLike = () => requireLogin(() => {
+    // TODO: call like API
+    Alert.alert("❤️", "पसंद कइलऽ!");
+  });
+
+  const handleSave = () => requireLogin(() => {
+    // TODO: call save/bookmark API
+    Alert.alert("🔖", "सेव हो गइल!");
+  });
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `"${story.title}" सुनीं Hamaar Kissa पर 🎙️\nhttps://hamaar-kissa-api.onrender.com`,
+        title: story.title,
+      });
+    } catch {}
+  };
+
+  const handleDownload = () => requireLogin(() => {
+    // TODO: implement download
+    Alert.alert("⬇️", "जल्दी आवत बा!");
+  });
 
   if (compact) {
     return (
@@ -97,12 +143,20 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
             {story.narrator} • {formatDuration(story.duration)}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={onPress}
-          style={[styles.compactPlay, { backgroundColor: isPlaying ? colors.primary : colors.secondary }]}
-        >
-          <Feather name={isPlaying ? "pause" : "play"} size={18} color={isPlaying ? "#fff" : colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.compactActions}>
+          <TouchableOpacity onPress={handleLike} style={styles.actionBtn}>
+            <Feather name="heart" size={15} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
+            <Feather name="share-2" size={15} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onPress}
+            style={[styles.compactPlay, { backgroundColor: isPlaying ? colors.primary : colors.secondary }]}
+          >
+            <Feather name={isPlaying ? "pause" : "play"} size={18} color={isPlaying ? "#fff" : colors.primary} />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   }
@@ -131,7 +185,6 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
           </View>
         )}
 
-        {/* Category badge overlaid on image when thumbnail exists */}
         {thumbUri && (
           <View style={[styles.categoryOverlay, { backgroundColor: gradient[1] + "cc" }]}>
             <Text style={styles.categoryOverlayText}>{icon}</Text>
@@ -146,6 +199,23 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
           {story.title}
         </Text>
+
+        {/* Action buttons row */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity onPress={handleLike} style={styles.actionBtn}>
+            <Feather name="heart" size={14} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSave} style={styles.actionBtn}>
+            <Feather name="bookmark" size={14} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
+            <Feather name="share-2" size={14} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDownload} style={styles.actionBtn}>
+            <Feather name="download" size={14} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.footer}>
           <Text style={[styles.meta, { color: colors.mutedForeground }]}>
             {formatDuration(story.duration)}
@@ -214,7 +284,15 @@ const styles = StyleSheet.create({
   categoryBadge: { alignSelf: "flex-start", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   categoryText: { fontSize: 10, fontWeight: "600" },
   title: { fontSize: 13, fontWeight: "700", lineHeight: 18 },
-  footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+  },
+  actionBtn: {
+    padding: 4,
+  },
+  footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
   meta: { fontSize: 11 },
   playBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   compactCard: { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: 1, padding: 10, marginBottom: 10, gap: 12 },
@@ -224,5 +302,6 @@ const styles = StyleSheet.create({
   compactInfo: { flex: 1, gap: 3 },
   compactTitle: { fontSize: 14, fontWeight: "700", lineHeight: 19 },
   compactMeta: { fontSize: 12 },
+  compactActions: { flexDirection: "row", alignItems: "center", gap: 4 },
   compactPlay: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
 });
