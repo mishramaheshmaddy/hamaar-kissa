@@ -98,6 +98,9 @@ importers:
       '@react-native-firebase/auth':
         specifier: ^24.1.1
         version: 24.1.1(@react-native-firebase/app@24.1.1(@react-native-async-storage/async-storage@2.2.0(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1)))(expo@54.0.35)(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0))(expo@54.0.35)
+      '@react-native-google-signin/google-signin':
+        specifier: ^13.1.0
+        version: 13.3.1(expo@54.0.35)(react-dom@19.1.0(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
       expo-av:
         specifier: ^16.0.8
         version: 16.0.8(expo@54.0.35)(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)
@@ -1636,6 +1639,19 @@ packages:
       expo: '>=47.0.0'
     peerDependenciesMeta:
       expo:
+        optional: true
+
+  '@react-native-google-signin/google-signin@13.3.1':
+    resolution: {integrity: sha512-zLJxn6FZ5fUmtshmvUklN5eoxBf8TqAfUoW5fEycJ1zoyB9DjE0yB5LCoKNy+cZ3glyhji+cPXhfYsuzKzzFVQ==}
+    peerDependencies:
+      expo: '>=50.0.0'
+      react: '*'
+      react-dom: '*'
+      react-native: '*'
+    peerDependenciesMeta:
+      expo:
+        optional: true
+      react-dom:
         optional: true
 
   '@react-native/assets-registry@0.81.5':
@@ -6998,6 +7014,14 @@ snapshots:
       plist: 3.1.1
     optionalDependencies:
       expo: 54.0.35(@babel/core@7.29.7(supports-color@8.1.1))(@expo/metro-runtime@6.1.2)(expo-router@6.0.24)(graphql@16.8.1)(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)(supports-color@8.1.1)(typescript@5.9.3)
+
+  '@react-native-google-signin/google-signin@13.3.1(expo@54.0.35)(react-dom@19.1.0(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)':
+    dependencies:
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1)
+    optionalDependencies:
+      expo: 54.0.35(@babel/core@7.29.7(supports-color@8.1.1))(@expo/metro-runtime@6.1.2)(expo-router@6.0.24)(graphql@16.8.1)(react-native@0.81.5(@babel/core@7.29.7(supports-color@8.1.1))(@types/react@19.1.17)(react@19.1.0)(supports-color@8.1.1))(react@19.1.0)(supports-color@8.1.1)(typescript@5.9.3)
+      react-dom: 19.1.0(react@19.1.0)
 
   '@react-native/assets-registry@0.81.5': {}
 
