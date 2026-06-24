@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "980779060644",
+    "project_id": "hamaar-kissa",
+    "storage_bucket": "hamaar-kissa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980779060644:android:7e8299a0b0c1751fe30531",
+        "android_client_info": {
+          "package_name": "com.haamarkissa.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuQIq8QyD3NNH4NBAaHA4vdJCn1rEcmtY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

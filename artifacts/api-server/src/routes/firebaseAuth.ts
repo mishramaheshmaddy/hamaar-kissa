@@ -1,0 +1,78 @@
+import { Router } from "express";
+import * as admin from "firebase-admin";
+import { db } from "../db";
+import { usersTable } from "@hamaar-kissa/db/schema/users";
+import { eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
+
+const router = Router();
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  const serviceAccount = require("../../firebase-service-account.json");
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
+
+const JWT_SECRET = process.env["JWT_SECRET"] ?? "hamaar-kissa-secret";
+
+router.post("/auth/firebase", async (req, res) => {
+  try {
+    const { firebaseToken } = req.body as { firebaseToken?: string };
+    if (!firebaseToken) {
+      res.status(400).json({ error: "firebaseToken required" });
+      return;
+    }
+
+    // Verify Firebase token
+    const decoded = await admin.auth().verifyIdToken(firebaseToken);
+    const phone = decoded.phone_number ?? null;
+    const email = decoded.email ?? null;
+    const name = decoded.name ?? (phone ? phone : (email ?? "User"));
+    const provider = decoded.firebase.sign_in_provider;
+
+    // Find or create user
+    let user = null;
+    if (phone) {
+      const existing = await db.select().from(usersTable).where(eq(usersTable.phone, phone));
+      user = existing[0] ?? null;
+    } else if (email) {
+      const existing = await db.select().from(usersTable).where(eq(usersTable.email, email));
+      user = existing[0] ?? null;
+    }
+
+    if (!user) {
+      const inserted = await db.insert(usersTable).values({
+        name,
+        email,
+        phone,
+        authProvider: provider,
+        avatarUrl: decoded.picture ?? null,
+      }).returning();
+      user = inserted[0];
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        avatarUrl: user.avatarUrl,
+        authProvider: user.authProvider,
+        createdAt: user.createdAt,
+        location: user.location ?? null,
+      },
+    });
+  } catch (err) {
+    console.error("Firebase auth error:", err);
+    res.status(401).json({ error: "Invalid Firebase token" });
+  }
+});
+
+export default router;

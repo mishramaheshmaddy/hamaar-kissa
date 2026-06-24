@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import auth from "@react-native-firebase/auth";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
@@ -22,6 +23,9 @@ interface AuthContextType {
   login: (token: string, user: AuthUser) => Promise<void>;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
+  sendOTP: (phone: string) => Promise<any>;
+  verifyOTP: (confirmation: any, otp: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,14 +74,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    try { await auth().signOut(); } catch {}
     setToken(null);
     setUser(null);
     await AsyncStorage.removeItem("hk_token");
     await AsyncStorage.removeItem("hk_user");
   };
 
+  // Send OTP via Firebase Phone Auth
+  const sendOTP = async (phone: string) => {
+    const confirmation = await auth().signInWithPhoneNumber(phone);
+    return confirmation;
+  };
+
+  // Verify OTP and login to backend
+  const verifyOTP = async (confirmation: any, otp: string) => {
+    const result = await confirmation.confirm(otp);
+    const firebaseToken = await result.user.getIdToken();
+    const res = await fetch(`${BASE}/api/auth/firebase`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firebaseToken }),
+    });
+    if (!res.ok) throw new Error("Backend auth failed");
+    const data = await res.json();
+    await login(data.token, data.user);
+  };
+
+  // Google Sign In
+  const signInWithGoogle = async () => {
+    const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
+    GoogleSignin.configure({
+      webClientId: "980779060644-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+    });
+    await GoogleSignin.hasPlayServices();
+    const userInfo = await GoogleSignin.signIn();
+    const googleCredential = auth.GoogleAuthProvider.credential(userInfo.data?.idToken ?? "");
+    const result = await auth().signInWithCredential(googleCredential);
+    const firebaseToken = await result.user.getIdToken();
+    const res = await fetch(`${BASE}/api/auth/firebase`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firebaseToken }),
+    });
+    if (!res.ok) throw new Error("Backend auth failed");
+    const data = await res.json();
+    await login(data.token, data.user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, fetchUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, fetchUser, sendOTP, verifyOTP, signInWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

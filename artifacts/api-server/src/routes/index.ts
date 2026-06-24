@@ -11,6 +11,7 @@ import storageRouter from "./storage";
 import homeSectionsRouter from "./homeSections";
 import userSubmissionsRouter from "./userSubmissions";
 import shareRouter from "./share";
+import firebaseAuthRouter from "./firebaseAuth";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(storageRouter);
 router.use(homeSectionsRouter);
 router.use(userSubmissionsRouter);
 router.use(shareRouter);
+router.use(firebaseAuthRouter);
 
 export default router;
