@@ -4,22 +4,13 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import React, { useRef, useState } from "react";
 import {
-  Alert,
   Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  Share,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { useAuth } from "@/context/AuthContext";
+
 import { VideoItem } from "@/data/mockData";
 
 const { width, height } = Dimensions.get("window");
@@ -91,54 +82,11 @@ interface VideoCardProps {
 }
 
 export default function VideoCard({ video, isActive }: VideoCardProps) {
-  const { user } = useAuth();
-  const router = useRouter();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const [saved, setSaved] = useState(false);
   const [localPlayerOpen, setLocalPlayerOpen] = useState(false);
-  const [commentOpen, setCommentOpen] = useState(false);
-  const [comments, setComments] = useState<{id: number; user: string; text: string}[]>([
-    { id: 1, user: "रामू भइया", text: "बहुत बढ़िया वीडियो बा! 👏" },
-    { id: 2, user: "सीता दीदी", text: "मन खुश हो गइल 😊" },
-  ]);
-  const [newComment, setNewComment] = useState("");
   const videoRef = useRef(null);
-
-  const requireLogin = (action: () => void) => {
-    if (!user) {
-      Alert.alert(
-        "लॉगिन करीं 🙏",
-        "इ feature के use करे खातिर पहिले login करीं।",
-        [
-          { text: "बाद में", style: "cancel" },
-          { text: "Login करीं", onPress: () => router.push("/login" as any) },
-        ]
-      );
-      return;
-    }
-    action();
-  };
-
-  const handleAddComment = () => {
-    if (!newComment.trim()) return;
-    setComments(prev => [...prev, {
-      id: Date.now(),
-      user: user?.name || "आप",
-      text: newComment.trim(),
-    }]);
-    setNewComment("");
-  };
-
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `"${video.title}" देखीं Hamaar Kissa पर 🎬
-https://hamaar-kissa-api.onrender.com`,
-        title: video.title,
-      });
-    } catch {}
-  };
 
   const numericId = parseInt(video.id, 10) || 0;
   const bgColor = BG_COLORS[numericId % BG_COLORS.length];
@@ -228,11 +176,11 @@ https://hamaar-kissa-api.onrender.com`,
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={() => requireLogin(async () => {
+              onPress={async () => {
                 await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setLiked((l) => !l);
                 setLikeCount((c) => (liked ? c - 1 : c + 1));
-              })}
+              }}
             >
               <Feather name="heart" size={26} color={liked ? "#FF4444" : "#fff"} />
               <Text style={styles.actionLabel}>
@@ -242,25 +190,22 @@ https://hamaar-kissa-api.onrender.com`,
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => setCommentOpen(true)}
-            >
+            <TouchableOpacity style={styles.actionBtn}>
               <Feather name="message-circle" size={26} color="#fff" />
               <Text style={styles.actionLabel}>बतावऽ</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+            <TouchableOpacity style={styles.actionBtn}>
               <Feather name="share-2" size={26} color="#fff" />
               <Text style={styles.actionLabel}>शेयर</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={() => requireLogin(async () => {
+              onPress={async () => {
                 await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setSaved((s) => !s);
-              })}
+              }}
             >
               <Feather name="bookmark" size={26} color={saved ? "#F5A623" : "#fff"} />
               <Text style={styles.actionLabel}>सेव</Text>
@@ -268,60 +213,6 @@ https://hamaar-kissa-api.onrender.com`,
           </View>
         </>
       )}
-      {/* Comment Modal */}
-      <Modal
-        visible={commentOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCommentOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setCommentOpen(false)}>
-          <View style={styles.modalOverlay} />
-        </TouchableWithoutFeedback>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.commentSheet}
-        >
-          <View style={styles.commentHandle} />
-          <View style={styles.commentHeader}>
-            <Text style={styles.commentTitle}>बतावऽ ({comments.length})</Text>
-            <TouchableOpacity onPress={() => setCommentOpen(false)}>
-              <Feather name="x" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.commentList} showsVerticalScrollIndicator={false}>
-            {comments.map((c) => (
-              <View key={c.id} style={styles.commentItem}>
-                <View style={styles.commentAvatar}>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
-                    {c.user.charAt(0)}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.commentUser}>{c.user}</Text>
-                  <Text style={styles.commentText}>{c.text}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="अपनी बात लिखीं..."
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              value={newComment}
-              onChangeText={setNewComment}
-              onSubmitEditing={() => requireLogin(handleAddComment)}
-            />
-            <TouchableOpacity
-              style={styles.commentSend}
-              onPress={() => requireLogin(handleAddComment)}
-            >
-              <Feather name="send" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
@@ -405,70 +296,5 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.5)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
-  },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
-  commentSheet: {
-    backgroundColor: "#1a1a1a",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "70%",
-    paddingBottom: 30,
-  },
-  commentHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  commentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
-  },
-  commentTitle: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  commentList: { paddingHorizontal: 16, paddingTop: 12, maxHeight: 300 },
-  commentItem: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  commentAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#E8530A",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  commentUser: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  commentText: { color: "rgba(255,255,255,0.8)", fontSize: 13, marginTop: 2 },
-  commentInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
-  },
-  commentInput: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    color: "#fff",
-    fontSize: 14,
-  },
-  commentSend: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#E8530A",
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
