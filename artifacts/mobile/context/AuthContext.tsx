@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
     GoogleSignin.configure({
-      webClientId: "980779060644-YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+      webClientId: "980779060644-3imt0epjlh3i2ubshu0rj8tsi8do8i8c.apps.googleusercontent.com",
     });
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
