@@ -100,7 +100,7 @@ export default function AudioStoryForm() {
         homeSectionId: story.homeSectionId || undefined,
       });
       if (story.categoryId) {
-        setTimeout(() => { form.setValue("categoryId", story.categoryId!); }, 100);
+        setTimeout(() => { form.setValue("categoryId", story.categoryId!); }, 500);
       }
     }
   }, [story, isNew]);
