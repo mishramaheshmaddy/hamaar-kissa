@@ -267,7 +267,7 @@ router.get("/home-sections", async (req, res) => {
         categoryId: section.categoryId,
         sortOrder: section.sortOrder,
         isActive: section.isActive,
-        items: items.slice(0, 10),
+        items: manualItems.length > 0 ? items : items.slice(0, 10),
       };
     })
   );
