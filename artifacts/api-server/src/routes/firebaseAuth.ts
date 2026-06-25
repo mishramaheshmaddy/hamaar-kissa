@@ -1,5 +1,4 @@
 import { Router } from "express";
-import * as admin from "firebase-admin";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -7,14 +6,18 @@ import jwt from "jsonwebtoken";
 
 const router = Router();
 
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env["FIREBASE_SERVICE_ACCOUNT"] ?? "{}");
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
-
 const JWT_SECRET = process.env["JWT_SECRET"] ?? "hamaar-kissa-secret";
+
+async function getAdmin() {
+  const admin = await import("firebase-admin");
+  if (!admin.default.apps.length) {
+    const serviceAccount = JSON.parse(process.env["FIREBASE_SERVICE_ACCOUNT"] ?? "{}");
+    admin.default.initializeApp({
+      credential: admin.default.credential.cert(serviceAccount as any),
+    });
+  }
+  return admin.default;
+}
 
 router.post("/auth/firebase", async (req, res) => {
   try {
@@ -24,6 +27,7 @@ router.post("/auth/firebase", async (req, res) => {
       return;
     }
 
+    const admin = await getAdmin();
     const decoded = await admin.auth().verifyIdToken(firebaseToken);
     const phone = decoded.phone_number ?? null;
     const email = decoded.email ?? null;
