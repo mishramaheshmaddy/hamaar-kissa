@@ -11,7 +11,39 @@ router.get("/home-sections", async (req, res) => {
     sections.map(async (section) => {
       let items: Array<Record<string, unknown>> = [];
 
-      if (section.contentSource === "category" && section.categoryId) {
+      // Always check home_section_items first — if any exist, use them regardless of contentSource
+      const manualItems = await db
+        .select()
+        .from(homeSectionItemsTable)
+        .where(eq(homeSectionItemsTable.homeSectionId, section.id))
+        .orderBy(asc(homeSectionItemsTable.sortOrder));
+
+      if (manualItems.length > 0) {
+        const resolved = await Promise.all(manualItems.map(async (si) => {
+          if (si.contentType === "audio") {
+            const rows = await db
+              .select({ story: audioStoriesTable, categoryName: categoriesTable.label })
+              .from(audioStoriesTable)
+              .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
+              .where(eq(audioStoriesTable.id, si.contentId))
+              .limit(1);
+            if (!rows.length) return null;
+            const { story, categoryName } = rows[0];
+            return { id: story.id, title: story.title, categoryName: categoryName ?? null, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl ?? null, audioUrl: story.audioUrl, type: "audio" as const };
+          } else {
+            const rows = await db
+              .select({ video: videosTable, categoryName: categoriesTable.label })
+              .from(videosTable)
+              .leftJoin(categoriesTable, eq(videosTable.categoryId, categoriesTable.id))
+              .where(eq(videosTable.id, si.contentId))
+              .limit(1);
+            if (!rows.length) return null;
+            const { video, categoryName } = rows[0];
+            return { id: video.id, title: video.title, categoryName: categoryName ?? null, thumbnailUrl: video.thumbnailUrl ?? null, videoUrl: video.videoUrl, type: "video" as const };
+          }
+        }));
+        items = resolved.filter(Boolean) as any[];
+      } else if (section.contentSource === "category" && section.categoryId) {
         if (section.type === "audio") {
           const rows = await db
             .select({ story: audioStoriesTable, categoryName: categoriesTable.label })
