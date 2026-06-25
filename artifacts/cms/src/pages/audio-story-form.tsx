@@ -205,8 +205,8 @@ export default function AudioStoryForm() {
                       <FormLabel>Category</FormLabel>
                       <Select 
                         onValueChange={(val) => field.onChange(parseInt(val))} 
-                        value={String(field.value ?? "")}
-                        defaultValue={String(field.value ?? "")}
+                        value={field.value ? String(field.value) : ""}
+                        defaultValue={field.value ? String(field.value) : ""}
                       >
                         <FormControl>
                           <SelectTrigger>
