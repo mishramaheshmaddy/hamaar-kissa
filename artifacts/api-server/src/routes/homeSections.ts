@@ -155,43 +155,38 @@ router.get("/home-sections", async (req, res) => {
           })));
         }
       } else if (section.contentSource === "manual") {
-        // Fetch items directly assigned to this home section
-        if (section.type === "audio" || section.type === "both") {
-          const rows = await db
-            .select({ story: audioStoriesTable, categoryName: categoriesTable.label })
-            .from(audioStoriesTable)
-            .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
-            .where(eq((audioStoriesTable as any).homeSectionId, section.id))
-            .orderBy(desc(audioStoriesTable.id))
-            .limit(10);
-          items.push(...rows.map(({ story, categoryName }) => ({
-            id: story.id,
-            title: story.title,
-            categoryName: categoryName ?? null,
-            narrator: story.narrator,
-            durationSeconds: story.durationSeconds,
-            thumbnailUrl: story.thumbnailUrl ?? null,
-            audioUrl: story.audioUrl,
-            type: "audio" as const,
-          })));
-        }
-        if (section.type === "video" || section.type === "both") {
-          const rows = await db
-            .select({ video: videosTable, categoryName: categoriesTable.label })
-            .from(videosTable)
-            .leftJoin(categoriesTable, eq(videosTable.categoryId, categoriesTable.id))
-            .where(eq((videosTable as any).homeSectionId, section.id))
-            .orderBy(desc(videosTable.id))
-            .limit(10);
-          items.push(...rows.map(({ video, categoryName }) => ({
-            id: video.id,
-            title: video.title,
-            categoryName: categoryName ?? null,
-            thumbnailUrl: video.thumbnailUrl ?? null,
-            videoUrl: video.videoUrl,
-            type: "video" as const,
-          })));
-        }
+        // Fetch from home_section_items table in saved order
+        const sectionItems = await db
+          .select()
+          .from(homeSectionItemsTable)
+          .where(eq(homeSectionItemsTable.homeSectionId, section.id))
+          .orderBy(asc(homeSectionItemsTable.sortOrder));
+
+        const resolved = await Promise.all(sectionItems.map(async (si) => {
+          if (si.contentType === "audio") {
+            const rows = await db
+              .select({ story: audioStoriesTable, categoryName: categoriesTable.label })
+              .from(audioStoriesTable)
+              .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
+              .where(eq(audioStoriesTable.id, si.contentId))
+              .limit(1);
+            if (!rows.length) return null;
+            const { story, categoryName } = rows[0];
+            return { id: story.id, title: story.title, categoryName: categoryName ?? null, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl ?? null, audioUrl: story.audioUrl, type: "audio" as const };
+          } else {
+            const rows = await db
+              .select({ video: videosTable, categoryName: categoriesTable.label })
+              .from(videosTable)
+              .leftJoin(categoriesTable, eq(videosTable.categoryId, categoriesTable.id))
+              .where(eq(videosTable.id, si.contentId))
+              .limit(1);
+            if (!rows.length) return null;
+            const { video, categoryName } = rows[0];
+            return { id: video.id, title: video.title, categoryName: categoryName ?? null, thumbnailUrl: video.thumbnailUrl ?? null, videoUrl: video.videoUrl, type: "video" as const };
+          }
+        }));
+
+        items.push(...resolved.filter(Boolean) as any[]);
       } else if (section.contentSource === "trending") {
         if (section.type === "audio" || section.type === "both") {
           const rows = await db
