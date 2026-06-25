@@ -13,6 +13,7 @@ export const audioStoriesTable = pgTable("audio_stories", {
   audioUrl: text("audio_url").notNull(),
   sourceType: text("source_type").notNull().default("url"),
   published: boolean("published").notNull().default(false),
+  homeSectionId: integer("home_section_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

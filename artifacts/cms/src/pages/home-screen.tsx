@@ -194,6 +194,7 @@ export default function HomeScreenManager() {
                   <option value="featured">Featured</option>
                   <option value="trending">Trending</option>
                   <option value="category">Category</option>
+                  <option value="manual">Manual (Direct Select)</option>
                 </select>
               </div>
               <div>

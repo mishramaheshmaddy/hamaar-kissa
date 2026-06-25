@@ -8,7 +8,8 @@ import {
   useUpdateAudioStory,
   useGetAudioStory,
   useListCategories,
-  getListAudioStoriesQueryKey
+  getListAudioStoriesQueryKey,
+  useListHomeSections
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const schema = z.object({
   sourceType: z.string().min(1, "Source type is required"),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
+  homeSectionId: z.coerce.number().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -48,6 +50,15 @@ export default function AudioStoryForm() {
   const { data: story, isLoading } = useGetAudioStory(id!, { query: { enabled: !!id, queryKey: ["audio-story", id!] } });
   const { data: categoriesRaw } = useListCategories({});
   const categories = categoriesRaw?.filter((c) => c.type === "audio" || c.type === "both");
+  
+  // Fetch home sections for dropdown
+  const [homeSections, setHomeSections] = useState<{id: number; title: string}[]>([]);
+  useEffect(() => {
+    fetch("/api/home-sections/all", { credentials: "include" })
+      .then(r => r.json())
+      .then(data => setHomeSections(data))
+      .catch(() => {});
+  }, []);
   
   const createStory = useCreateAudioStory();
   const updateStory = useUpdateAudioStory();
@@ -69,6 +80,7 @@ export default function AudioStoryForm() {
       sourceType: "upload",
       published: false,
       sortOrder: 0,
+      homeSectionId: undefined,
     },
   });
 
@@ -85,6 +97,7 @@ export default function AudioStoryForm() {
         sourceType: story.sourceType,
         published: story.published,
         sortOrder: story.sortOrder,
+        homeSectionId: story.homeSectionId || undefined,
       });
     }
   }, [story, isNew, form]);
@@ -327,6 +340,36 @@ export default function AudioStoryForm() {
                   )}
                 />
               </div>
+
+              {/* Home Section Dropdown */}
+              <FormField
+                control={form.control}
+                name="homeSectionId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Home Section (Optional)</FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(val === "none" ? undefined : parseInt(val))}
+                      value={field.value ? String(field.value) : "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select home section" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">-- Koi nahi --</SelectItem>
+                        {homeSections?.map((sec) => (
+                          <SelectItem key={sec.id} value={sec.id.toString()}>
+                            {sec.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

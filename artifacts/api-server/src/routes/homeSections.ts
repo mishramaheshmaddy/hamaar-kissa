@@ -154,6 +154,44 @@ router.get("/home-sections", async (req, res) => {
             type: "video" as const,
           })));
         }
+      } else if (section.contentSource === "manual") {
+        // Fetch items directly assigned to this home section
+        if (section.type === "audio" || section.type === "both") {
+          const rows = await db
+            .select({ story: audioStoriesTable, categoryName: categoriesTable.label })
+            .from(audioStoriesTable)
+            .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
+            .where(eq((audioStoriesTable as any).homeSectionId, section.id))
+            .orderBy(desc(audioStoriesTable.id))
+            .limit(10);
+          items.push(...rows.map(({ story, categoryName }) => ({
+            id: story.id,
+            title: story.title,
+            categoryName: categoryName ?? null,
+            narrator: story.narrator,
+            durationSeconds: story.durationSeconds,
+            thumbnailUrl: story.thumbnailUrl ?? null,
+            audioUrl: story.audioUrl,
+            type: "audio" as const,
+          })));
+        }
+        if (section.type === "video" || section.type === "both") {
+          const rows = await db
+            .select({ video: videosTable, categoryName: categoriesTable.label })
+            .from(videosTable)
+            .leftJoin(categoriesTable, eq(videosTable.categoryId, categoriesTable.id))
+            .where(eq((videosTable as any).homeSectionId, section.id))
+            .orderBy(desc(videosTable.id))
+            .limit(10);
+          items.push(...rows.map(({ video, categoryName }) => ({
+            id: video.id,
+            title: video.title,
+            categoryName: categoryName ?? null,
+            thumbnailUrl: video.thumbnailUrl ?? null,
+            videoUrl: video.videoUrl,
+            type: "video" as const,
+          })));
+        }
       } else if (section.contentSource === "trending") {
         if (section.type === "audio" || section.type === "both") {
           const rows = await db

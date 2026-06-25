@@ -49,6 +49,7 @@ router.post("/audio-stories", async (req, res) => {
     sourceType: body.sourceType,
     published: body.published ?? false,
     sortOrder: body.sortOrder ?? 0,
+    homeSectionId: (body as any).homeSectionId ?? null,
   }).returning();
   res.status(201).json(toDto(row, null));
 });
@@ -93,6 +94,7 @@ function toDto(row: typeof audioStoriesTable.$inferSelect, categoryName: string 
     sourceType: row.sourceType,
     published: row.published,
     sortOrder: row.sortOrder,
+    homeSectionId: row.homeSectionId ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

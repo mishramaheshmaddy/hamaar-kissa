@@ -12,6 +12,7 @@ export const videosTable = pgTable("videos", {
   sourceType: text("source_type").notNull().default("url"),
   youtubeId: text("youtube_id"),
   views: integer("views").notNull().default(0),
+  homeSectionId: integer("home_section_id"),
   published: boolean("published").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
