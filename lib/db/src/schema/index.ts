@@ -4,3 +4,4 @@ export * from "./videos";
 export * from "./homeSections";
 export * from "./users";
 export * from "./userSubmissions";
+export * from "./homeSectionItems";

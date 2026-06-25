@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, desc, asc } from "drizzle-orm";
-import { db, homeSectionsTable, audioStoriesTable, videosTable, categoriesTable } from "@workspace/db";
+import { db, homeSectionsTable, audioStoriesTable, videosTable, categoriesTable, homeSectionItemsTable } from "@workspace/db";
 
 const router = Router();
 
@@ -295,6 +295,57 @@ router.delete("/home-sections/:id", async (req, res) => {
   const id = Number(req.params.id);
   await db.delete(homeSectionsTable).where(eq(homeSectionsTable.id, id));
   res.status(204).send();
+});
+
+
+router.get("/home-sections/:id/content", async (req, res) => {
+  const id = Number(req.params.id);
+  const section = await db.select().from(homeSectionsTable).where(eq(homeSectionsTable.id, id)).limit(1);
+  if (!section.length) { res.status(404).json({ error: "Not found" }); return; }
+  
+  const items = await db.select().from(homeSectionItemsTable).where(eq(homeSectionItemsTable.homeSectionId, id)).orderBy(asc(homeSectionItemsTable.sortOrder));
+  
+  const result = await Promise.all(items.map(async (item) => {
+    if (item.contentType === "audio") {
+      const rows = await db.select({ story: audioStoriesTable, categoryName: categoriesTable.label })
+        .from(audioStoriesTable)
+        .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
+        .where(eq(audioStoriesTable.id, item.contentId)).limit(1);
+      if (!rows.length) return null;
+      const { story, categoryName } = rows[0];
+      return { id: story.id, title: story.title, categoryName, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl, audioUrl: story.audioUrl, type: "audio", sortOrder: item.sortOrder };
+    } else {
+      const rows = await db.select({ video: videosTable, categoryName: categoriesTable.label })
+        .from(videosTable)
+        .leftJoin(categoriesTable, eq(videosTable.categoryId, categoriesTable.id))
+        .where(eq(videosTable.id, item.contentId)).limit(1);
+      if (!rows.length) return null;
+      const { video, categoryName } = rows[0];
+      return { id: video.id, title: video.title, categoryName, thumbnailUrl: video.thumbnailUrl, videoUrl: video.videoUrl, type: "video", sortOrder: item.sortOrder };
+    }
+  }));
+  
+  res.json(result.filter(Boolean));
+});
+
+router.put("/home-sections/:id/content", async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body as { items: Array<{ id: number; contentType: string; sortOrder: number }> };
+  
+  await db.delete(homeSectionItemsTable).where(eq(homeSectionItemsTable.homeSectionId, id));
+  
+  if (body.items && body.items.length > 0) {
+    await db.insert(homeSectionItemsTable).values(
+      body.items.map(item => ({
+        homeSectionId: id,
+        contentType: item.contentType,
+        contentId: item.id,
+        sortOrder: item.sortOrder,
+      }))
+    );
+  }
+  
+  res.json({ ok: true });
 });
 
 function toDto(row: typeof homeSectionsTable.$inferSelect) {
