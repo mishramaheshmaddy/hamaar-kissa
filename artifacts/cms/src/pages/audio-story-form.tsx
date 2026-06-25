@@ -103,7 +103,7 @@ export default function AudioStoryForm() {
         setTimeout(() => { form.setValue("categoryId", story.categoryId!); }, 100);
       }
     }
-  }, [story, isNew, form, categories]);
+  }, [story, isNew]);
 
   const onSubmit = (data: FormValues) => {
     if (isNew) {
