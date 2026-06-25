@@ -27,7 +27,7 @@ export default function HomeScreenManager() {
     title: "",
     subtitle: "",
     type: "audio",
-    contentSource: "latest",
+    contentSource: "manual",
     categoryId: "",
     sortOrder: 0,
     isActive: true,
@@ -128,7 +128,7 @@ export default function HomeScreenManager() {
       }
       setShowForm(false);
       setEditId(null);
-      setForm({ title: "", subtitle: "", type: "audio", contentSource: "latest", categoryId: "", sortOrder: 0, isActive: true });
+      setForm({ title: "", subtitle: "", type: "audio", contentSource: "manual", categoryId: "", sortOrder: 0, isActive: true });
       fetchSections();
     } catch {
       toast({ title: "Failed", variant: "destructive" });
@@ -160,7 +160,7 @@ export default function HomeScreenManager() {
           <Button variant="outline" onClick={handleReorder} className="gap-2">
             <Save className="w-4 h-4" /> Save Order
           </Button>
-          <Button onClick={() => { setShowForm(true); setEditId(null); setForm({ title: "", subtitle: "", type: "audio", contentSource: "latest", categoryId: "", sortOrder: 0, isActive: true }); }} className="gap-2">
+          <Button onClick={() => { setShowForm(true); setEditId(null); setForm({ title: "", subtitle: "", type: "audio", contentSource: "manual", categoryId: "", sortOrder: 0, isActive: true }); }} className="gap-2">
             <Plus className="w-4 h-4" /> Add Section
           </Button>
         </div>
@@ -190,10 +190,6 @@ export default function HomeScreenManager() {
               <div>
                 <label className="text-sm font-medium">Content Source</label>
                 <select className="w-full border rounded-md px-3 py-2 mt-1" value={form.contentSource} onChange={(e) => setForm({ ...form, contentSource: e.target.value })}>
-                  <option value="latest">Latest</option>
-                  <option value="featured">Featured</option>
-                  <option value="trending">Trending</option>
-                  <option value="category">Category</option>
                   <option value="manual">Manual (Direct Select)</option>
                 </select>
               </div>
