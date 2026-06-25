@@ -85,7 +85,7 @@ export default function AudioStoryForm() {
   });
 
   useEffect(() => {
-    if (story && !isNew) {
+    if (story && !isNew && categories && categories.length > 0) {
       form.reset({
         title: story.title,
         categoryId: story.categoryId || undefined,
