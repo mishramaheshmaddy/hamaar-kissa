@@ -269,11 +269,7 @@ export default function HomeScreenManager() {
                 <option value="audio">Audio</option><option value="video">Video</option><option value="both">Both</option>
               </select>
             </div>
-            <div><label className="text-sm font-medium">Content Source</label>
-              <select className="w-full border rounded-md px-3 py-2 mt-1" value={form.contentSource} onChange={e => setForm({ ...form, contentSource: e.target.value })}>
-                <option value="manual">Manual (Direct Select)</option>
-              </select>
-            </div>
+
             <div><label className="text-sm font-medium">Sort Order</label><input className="w-full border rounded-md px-3 py-2 mt-1" type="number" value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })} /></div>
           </div>
           <div className="flex items-center gap-2"><label className="text-sm font-medium">Active</label><Switch checked={form.isActive} onCheckedChange={checked => setForm({ ...form, isActive: checked })} /></div>
