@@ -48,13 +48,13 @@ export default function AudioStoryForm() {
   const queryClient = useQueryClient();
 
   const { data: story, isLoading } = useGetAudioStory(id!, { query: { enabled: !!id, queryKey: ["audio-story", id!] } });
-  const { data: categoriesRaw } = useListCategories({});
+  const { data: categoriesRaw } = useListCategories({ request: { headers: { "Cache-Control": "no-cache" } } });
   const categories = categoriesRaw?.filter((c) => c.type === "audio" || c.type === "both");
   
   // Fetch home sections for dropdown
   const [homeSections, setHomeSections] = useState<{id: number; title: string}[]>([]);
   useEffect(() => {
-    fetch("/api/home-sections/all", { credentials: "include" })
+    fetch("/api/home-sections/all", { credentials: "include", cache: "no-store" })
       .then(r => r.json())
       .then(data => setHomeSections(data))
       .catch(() => {});
