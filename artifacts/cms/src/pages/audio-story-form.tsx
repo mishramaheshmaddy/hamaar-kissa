@@ -99,8 +99,11 @@ export default function AudioStoryForm() {
         sortOrder: story.sortOrder,
         homeSectionId: story.homeSectionId || undefined,
       });
+      if (story.categoryId) {
+        setTimeout(() => { form.setValue("categoryId", story.categoryId!); }, 100);
+      }
     }
-  }, [story, isNew, form]);
+  }, [story, isNew, form, categories]);
 
   const onSubmit = (data: FormValues) => {
     if (isNew) {
