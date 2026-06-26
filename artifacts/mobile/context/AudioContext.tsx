@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
+import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
 import React, {
   createContext,
   useCallback,
@@ -130,7 +131,18 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const uri = story.audioUrl.startsWith("/") ? `${BASE}${story.audioUrl}` : story.audioUrl;
+      let uri = story.audioUrl.startsWith("/")
+        ? `${BASE}${story.audioUrl}`
+        : story.audioUrl;
+
+      try {
+        if (await isDownloaded(story.id)) {
+          uri = getLocalPath(story.id);
+          console.log("▶️ Playing offline:", uri);
+        }
+      } catch (e) {
+        console.log("Offline check failed:", e);
+      }
 
       try {
         const { sound } = await Audio.Sound.createAsync(

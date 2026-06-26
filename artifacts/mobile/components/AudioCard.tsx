@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -13,6 +13,8 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { AudioStory } from "@/context/AudioContext";
 import { useAuth } from "@/context/AuthContext";
+import { useDownloads } from "@/hooks/useDownloads";
+import { downloadAudio, getFileSize } from "@/lib/downloadManager";
 import { CATEGORY_GRADIENTS } from "./CategoryColors";
 
 interface AudioCardProps {
@@ -100,6 +102,52 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
   const handleSave = () => requireLogin(() => {
     // TODO: call save/bookmark API
     Alert.alert("🔖", "सेव हो गइल!");
+  });
+
+  const { isDownloaded, addDownload, removeDownload } = useDownloads();
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const downloaded = isDownloaded(story.id);
+
+  const handleDownloadPress = () => requireLogin(async () => {
+    if (downloaded) {
+      Alert.alert(
+        "डिलीट करीं?",
+        "डाउनलोड हटा दिया जाएगा।",
+        [
+          { text: "नाहीं", style: "cancel" },
+          { text: "हाँ", style: "destructive", onPress: () => removeDownload(story.id) },
+        ]
+      );
+      return;
+    }
+    if (!story.audioUrl) {
+      Alert.alert("Error", "Audio URL नइखे।");
+      return;
+    }
+    setDownloading(true);
+    setDownloadProgress(0);
+    try {
+      const localPath = await downloadAudio(story.id, story.audioUrl, setDownloadProgress);
+      const fileSize = await getFileSize(story.id);
+      await addDownload({
+        storyId: story.id,
+        title: story.title,
+        thumbnail: story.thumbnail || "",
+        duration: story.duration,
+        category: story.category,
+        narrator: story.narrator || "",
+        localPath,
+        fileSize,
+        downloadedAt: new Date().toISOString(),
+      });
+      Alert.alert("✅", "डाउनलोड पूरा भइल!");
+    } catch (e) {
+      Alert.alert("Error", "डाउनलोड फेल भइल। दोबारा कोशिश करीं।");
+    } finally {
+      setDownloading(false);
+      setDownloadProgress(0);
+    }
   });
 
   const handleShare = async () => {
@@ -211,8 +259,14 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
           <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
             <Feather name="share-2" size={14} color={colors.mutedForeground} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleDownload} style={styles.actionBtn}>
-            <Feather name="download" size={14} color={colors.mutedForeground} />
+          <TouchableOpacity onPress={handleDownloadPress} style={styles.actionBtn}>
+            {downloading ? (
+              <Text style={{ fontSize: 10, color: colors.primary, fontWeight: "700" }}>{downloadProgress}%</Text>
+            ) : downloaded ? (
+              <Feather name="check-circle" size={14} color={colors.primary} />
+            ) : (
+              <Feather name="download" size={14} color={colors.mutedForeground} />
+            )}
           </TouchableOpacity>
         </View>
 

@@ -1,24 +1,27 @@
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  ScrollView as ScrollViewRN,
-  Share,
-  TextInput,
-  TouchableWithoutFeedback, Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { Video, ResizeMode } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import React, { useRef, useState } from "react";
+
 import {
+  Alert,
   Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
+
 
 import { VideoItem } from "@/data/mockData";
 
@@ -279,7 +282,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
               <Feather name="x" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
-          <ScrollViewRN style={styles.commentList} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.commentList} showsVerticalScrollIndicator={false}>
             {comments.map((c) => (
               <View key={c.id} style={styles.commentItem}>
                 <View style={styles.commentAvatar}>
@@ -293,7 +296,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
                 </View>
               </View>
             ))}
-          </ScrollViewRN>
+          </ScrollView>
           <View style={styles.commentInputRow}>
             <TextInput
               style={styles.commentInput}

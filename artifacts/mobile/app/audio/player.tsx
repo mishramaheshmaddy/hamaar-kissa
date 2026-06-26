@@ -119,34 +119,20 @@ async function handleShare() {
 
   async function handleDownload() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!currentStory) return;
+    if (Platform.OS === "web") {
+      Alert.alert("डाउनलोड", "Mobile app पर उपलब्ध बा।");
+      return;
+    }
     if (!fullAudioUrl) {
       Alert.alert("डाउनलोड", "इस कहानी के लिए ऑडियो उपलब्ध नइखे।");
       return;
     }
-    if (Platform.OS === "web") {
-      try {
-        const a = document.createElement("a");
-        a.href = fullAudioUrl;
-        a.download = `${currentStory!.title}.mp3`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch (_e) {
-        Linking.openURL(fullAudioUrl);
-      }
-    } else {
-      Alert.alert(
-        "डाउनलोड",
-        "ब्राउज़र में खुलत बा जहाँ से डाउनलोड हो सकत बा।",
-        [
-          { text: "रद्द", style: "cancel" },
-          {
-            text: "खोलीं",
-            onPress: () => Linking.openURL(fullAudioUrl),
-          },
-        ]
-      );
-    }
+    
+    Alert.alert(
+      "डाउनलोड",
+      "Player download integration अभी पूरा नहीं हुआ है। फिलहाल Home/Audio list से डाउनलोड करें।"
+    );
   }
 
   return (
