@@ -1,24 +1,17 @@
 import { Router } from "express";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { createClient } from "@supabase/supabase-js";
 import { logger } from "../lib/logger";
 import { FetchYoutubeInfoBody } from "@workspace/api-zod";
 const router = Router();
 
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    cb(null, name);
-  },
-});
+const supabase = createClient(
+  process.env["SUPABASE_URL"]!,
+  process.env["SUPABASE_SERVICE_ROLE_KEY"]!,
+);
+
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -37,32 +30,47 @@ const upload = multer({
   },
 });
 
-router.post("/media/upload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    res.status(400).json({ error: "No file uploaded" });
-    return;
+
+router.post("/media/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const ext = req.file.originalname.includes(".")
+      ? req.file.originalname.substring(req.file.originalname.lastIndexOf("."))
+      : "";
+
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+
+    const { error } = await supabase.storage
+      .from("uploads")
+      .upload(filename, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const { data } = supabase.storage
+      .from("uploads")
+      .getPublicUrl(filename);
+
+    return res.json({
+      url: data.publicUrl,
+      filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Upload failed" });
   }
-
-  logger.info({
-    mimetype: req.file.mimetype,
-    filename: req.file.originalname,
-    size: req.file.size,
-  }, "Media upload received");
-
-  const fileUrl = `/api/media/files/${req.file.filename}`;
-  res.json({ url: fileUrl, filename: req.file.filename, size: req.file.size, mimetype: req.file.mimetype });
 });
 
-router.get("/media/files/:filename", (req, res) => {
-  const filePath = path.join(uploadDir, req.params.filename);
-
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "File not found" });
-    return;
-  }
-
-  res.sendFile(filePath);
-});
 
 router.post("/media/youtube-info", async (req, res) => {
   const body = FetchYoutubeInfoBody.parse(req.body);
