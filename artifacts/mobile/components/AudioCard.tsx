@@ -11,7 +11,10 @@ import {
   Alert,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { AudioStory } from "@/context/AudioContext";
+import {
+  AudioStory,
+  useAudio,
+} from "@/context/AudioContext";
 import { useAuth } from "@/context/AuthContext";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
@@ -73,6 +76,16 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();
+
+  const {
+    playStory,
+    addToQueue,
+    playNext,
+    playPrevious,
+    queue,
+    currentStory,
+  } = useAudio();
+
   const gradient = CATEGORY_GRADIENTS[story.category] ?? ["#E8530A", "#BF360C"];
   const icon = CATEGORY_ICONS[story.category] ?? "🎙️";
   const displayLabel = story.categoryName ?? CATEGORY_LABEL[story.category] ?? story.category;
@@ -108,6 +121,30 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const downloaded = isDownloaded(story.id);
+
+  const offlineBadge = downloaded ? (
+    <View
+      style={{
+        position: "absolute",
+        top: 8,
+        left: 8,
+        backgroundColor: "#16a34a",
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+      }}
+    >
+      <Text
+        style={{
+          color: "#fff",
+          fontSize: 10,
+          fontWeight: "700",
+        }}
+      >
+        Offline
+      </Text>
+    </View>
+  ) : null;
 
   const handleDownloadPress = () => requireLogin(async () => {
     if (downloaded) {
@@ -158,6 +195,39 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
       });
     } catch {}
   };
+
+
+  const handleMoreMenu = () => {
+    Alert.alert(
+      story.title,
+      "का करे के बा?",
+      [
+        {
+          text: "एहिजे सुनीं",
+          onPress: () => {
+            playStory(story);
+            onPress();
+          },
+        },
+        {
+          text: "सुने के लाइन में राखीं",
+          onPress: () => {
+            addToQueue(story);
+            Alert.alert("✅", "लाइन में जोड़ दिहल गइल।");
+          },
+        },
+        {
+          text: "साझा करीं",
+          onPress: handleShare,
+        },
+        {
+          text: "रद्द करीं",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
 
   const handleDownload = () => requireLogin(() => {
     // TODO: implement download
@@ -227,6 +297,8 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
           <Text style={styles.thumbIcon}>{icon}</Text>
         )}
 
+        {offlineBadge}
+
         {isPlaying && (
           <View style={[styles.nowPlaying, { backgroundColor: colors.primary }]}>
             <Feather name="play" size={10} color="#fff" />
@@ -268,6 +340,18 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
               <Feather name="download" size={14} color={colors.mutedForeground} />
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleMoreMenu}
+            style={styles.actionBtn}
+          >
+            <Feather
+              name="more-vertical"
+              size={14}
+              color={colors.mutedForeground}
+            />
+          </TouchableOpacity>
+
         </View>
 
         <View style={styles.footer}>

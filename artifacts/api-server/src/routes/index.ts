@@ -12,6 +12,7 @@ import homeSectionsRouter from "./homeSections";
 import userSubmissionsRouter from "./userSubmissions";
 import shareRouter from "./share";
 import firebaseAuthRouter from "./firebaseAuth";
+import searchRouter from "./search";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(homeSectionsRouter);
 router.use(userSubmissionsRouter);
 router.use(shareRouter);
 router.use(firebaseAuthRouter);
+router.use(searchRouter);
 
 export default router;

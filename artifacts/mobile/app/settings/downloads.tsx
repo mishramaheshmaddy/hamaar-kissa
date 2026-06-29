@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -33,10 +34,64 @@ function formatDate(iso: string): string {
 }
 
 export default function DownloadsScreen() {
+
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [sortBy, setSortBy] = React.useState<
+    "latest" | "oldest" | "az"
+  >("latest");
+
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { downloads, loading, totalSize, removeDownload, clearAll } = useDownloads();
+
+
+  const deleteAllDownloads = () => {
+    Alert.alert(
+      "डाउनलोड हटाईं",
+      "सभे डाउनलोड हटावल जाव?",
+      [
+        { text: "रद्द", style: "cancel" },
+        {
+          text: "हटाईं",
+          style: "destructive",
+          onPress: async () => {
+            for (const item of downloads) {
+              try {
+                await removeDownload(item.storyId);
+              } catch {}
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const filteredDownloads = [...downloads]
+    .filter(d =>
+      d.title.toLowerCase().includes(
+        searchQuery.toLowerCase()
+      )
+    )
+    .sort((a,b)=>{
+      if(sortBy==="az"){
+        return a.title.localeCompare(b.title);
+      }
+
+      if(sortBy==="oldest"){
+        return (
+          new Date(a.downloadedAt).getTime()-
+          new Date(b.downloadedAt).getTime()
+        );
+      }
+
+      return (
+        new Date(b.downloadedAt).getTime()-
+        new Date(a.downloadedAt).getTime()
+      );
+    });
+
+
   const { playStory } = useAudio();
 
   if (Platform.OS === "web") {
