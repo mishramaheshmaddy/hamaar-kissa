@@ -6,10 +6,16 @@ import { FetchYoutubeInfoBody } from "@workspace/api-zod";
 const router = Router();
 
 
-const supabase = createClient(
-  process.env["SUPABASE_URL"]!,
-  process.env["SUPABASE_SERVICE_ROLE_KEY"]!,
-);
+function getSupabase() {
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+
+  if (!url || !key) {
+    throw new Error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured.");
+  }
+
+  return createClient(url, key);
+}
 
 const storage = multer.memoryStorage();
 
@@ -42,6 +48,8 @@ router.post("/media/upload", upload.single("file"), async (req, res) => {
       : "";
 
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+
+    const supabase = getSupabase();
 
     const { error } = await supabase.storage
       .from("uploads")

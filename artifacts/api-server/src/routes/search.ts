@@ -5,6 +5,7 @@ import { db } from "@workspace/db";
 const router = Router();
 
 router.get("/search", async (req, res) => {
+  try {
   const q = String(req.query.q ?? "").trim();
 
   if (!q) {
@@ -83,6 +84,10 @@ router.get("/search", async (req, res) => {
       categoryName: r.categoryName,
     })),
   });
+  } catch (err) {
+    console.error("SEARCH ERROR:", err);
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 export default router;

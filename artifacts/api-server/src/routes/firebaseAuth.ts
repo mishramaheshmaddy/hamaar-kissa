@@ -9,14 +9,15 @@ const router = Router();
 const JWT_SECRET = process.env["JWT_SECRET"] ?? "hamaar-kissa-secret";
 
 async function getAdmin() {
-  const admin = await import("firebase-admin");
-  if (!admin.default.apps.length) {
+  const admin = await import("firebase-admin/app");
+  const auth = await import("firebase-admin/auth");
+  if (admin.getApps().length === 0) {
     const serviceAccount = JSON.parse(process.env["FIREBASE_SERVICE_ACCOUNT"] ?? "{}");
-    admin.default.initializeApp({
-      credential: admin.default.credential.cert(serviceAccount as any),
+    admin.initializeApp({
+      credential: admin.cert(serviceAccount as any),
     });
   }
-  return admin.default;
+  return { admin, auth };
 }
 
 router.post("/auth/firebase", async (req, res) => {
@@ -27,8 +28,8 @@ router.post("/auth/firebase", async (req, res) => {
       return;
     }
 
-    const admin = await getAdmin();
-    const decoded = await admin.auth().verifyIdToken(firebaseToken);
+    const { auth } = await getAdmin();
+    const decoded = await auth.getAuth().verifyIdToken(firebaseToken);
     const phone = decoded.phone_number ?? null;
     const email = decoded.email ?? null;
     const name = decoded.name ?? (phone ? phone : (email ?? "User"));
