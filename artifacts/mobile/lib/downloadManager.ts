@@ -2,7 +2,7 @@ import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
 
 const DOWNLOAD_DIR =
-  (FileSystem.Paths?.document?.uri ?? "file:///") +
+  (FileSystem.documentDirectory ?? "file:///") +
   "hamaar_kissa_downloads/";
 
 export async function ensureDownloadDir() {

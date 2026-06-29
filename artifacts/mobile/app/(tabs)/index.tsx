@@ -274,52 +274,6 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-
-            {continueListening.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader
-                  title="फिन से सुनीं"
-                  onSeeAll={() => router.push("/(tabs)/audio")}
-                />
-
-                <FlatList
-                  data={continueListening}
-                  horizontal
-                  keyExtractor={(item) => String(item.id)}
-                  showsHorizontalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <AudioCard
-                      story={{
-                        id: String(item.id),
-                        title: item.title,
-                        category: item.categoryName || "",
-                        categoryName: item.categoryName || "",
-                        narrator: item.narrator || "",
-                        duration: item.durationSeconds || 0,
-                        thumbnail: item.thumbnailUrl || "",
-                        audioUrl: item.audioUrl || "",
-                        description: "",
-                      }}
-                      onPress={() => {
-                        playStory({
-                          id: String(item.id),
-                          title: item.title,
-                          category: item.categoryName || "",
-                          categoryName: item.categoryName || "",
-                          narrator: item.narrator || "",
-                          duration: item.durationSeconds || 0,
-                          thumbnail: item.thumbnailUrl || "",
-                          audioUrl: item.audioUrl || "",
-                          description: "",
-                        });
-                        router.push("/audio/player");
-                      }}
-                      isPlaying={
-                        currentStory?.id === String(item.id) &&
-                        isPlaying
-                      }
-                    />
-                  )}
                 />
               </View>
             )}
