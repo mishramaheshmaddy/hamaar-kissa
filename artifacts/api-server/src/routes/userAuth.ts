@@ -188,6 +188,32 @@ router.get("/auth/me", async (req, res, next) => {
   res.json(toUserDto(user));
 });
 
+
+
+router.get("/auth/check-username", async (req,res)=>{
+
+  const username=String(req.query.username ?? "")
+    .trim()
+    .toLowerCase();
+
+  if(!username){
+    res.json({available:false});
+    return;
+  }
+
+  const existing=await db
+    .select({id:usersTable.id})
+    .from(usersTable)
+    .where(eq(usersTable.username,username))
+    .limit(1);
+
+  res.json({
+    available:existing.length===0
+  });
+
+});
+
+
 router.put("/auth/profile", async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith("Bearer ")) {
@@ -200,12 +226,72 @@ router.put("/auth/profile", async (req, res) => {
     res.status(401).json({ error: "Invalid token" });
     return;
   }
-  const { name, avatarUrl } = req.body as { name?: string; avatarUrl?: string };
-  const [user] = await db.update(usersTable).set({
-    name: name ?? undefined,
-    avatarUrl: avatarUrl ?? undefined,
-    updatedAt: new Date(),
-  }).where(eq(usersTable.id, decoded.userId)).returning();
+  const {
+    name,
+    avatarUrl,
+    username,
+    dateOfBirth,
+    age,
+    phone,
+    email,
+  } = req.body as {
+    name?: string;
+    avatarUrl?: string;
+    username?: string;
+    dateOfBirth?: string;
+    age?: number;
+    phone?: string;
+    email?: string;
+  };
+
+  if (username) {
+    const existing = await db.select()
+      .from(usersTable)
+      .where(eq(usersTable.username, username));
+
+    if (
+      existing.length &&
+      existing[0].id !== decoded.userId
+    ) {
+      return res.status(409).json({
+        error:"Username already taken"
+      });
+    }
+  }
+
+  const [current] = await db.select()
+    .from(usersTable)
+    .where(eq(usersTable.id,decoded.userId));
+
+  const [user]=await db.update(usersTable).set({
+
+    name:name ?? undefined,
+
+    avatarUrl:avatarUrl ?? undefined,
+
+    username:username ?? undefined,
+
+    dateOfBirth:dateOfBirth
+      ? new Date(dateOfBirth)
+      : undefined,
+
+    age:age ?? undefined,
+
+    phone:
+      current.authProvider==="phone"
+        ? undefined
+        : (phone ?? undefined),
+
+    email:
+      current.authProvider==="google"
+        ? undefined
+        : (email ?? undefined),
+
+    updatedAt:new Date(),
+
+  })
+  .where(eq(usersTable.id,decoded.userId))
+  .returning();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -221,6 +307,9 @@ function toUserDto(user: typeof usersTable.$inferSelect) {
     phone: user.phone,
     avatarUrl: user.avatarUrl,
     authProvider: user.authProvider,
+    username:user.username,
+    dateOfBirth:user.dateOfBirth,
+    age:user.age,
     createdAt: user.createdAt ? user.createdAt.toISOString() : null,
   };
 }

@@ -51,8 +51,16 @@ router.post("/media/upload", upload.single("file"), async (req, res) => {
 
     const supabase = getSupabase();
 
+    let bucket = "story-thumbnails";
+
+    if (req.file.mimetype.startsWith("audio/")) {
+      bucket = "story-audio";
+    } else if (req.file.mimetype.startsWith("video/")) {
+      bucket = "story-videos";
+    }
+
     const { error } = await supabase.storage
-      .from("uploads")
+      .from(bucket)
       .upload(filename, req.file.buffer, {
         contentType: req.file.mimetype,
         upsert: false,
@@ -64,7 +72,7 @@ router.post("/media/upload", upload.single("file"), async (req, res) => {
     }
 
     const { data } = supabase.storage
-      .from("uploads")
+      .from(bucket)
       .getPublicUrl(filename);
 
     return res.json({
@@ -130,5 +138,93 @@ router.post("/media/youtube-info", async (req, res) => {
     authorName: data.author_name,
   });
 });
+
+
+
+router.post("/media/migrate-supabase-urls", async (_req, res) => {
+  try {
+    const { db, audioStoriesTable, videosTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+
+    const AUDIO =
+      "https://ddsqgtiysfnxbltxrxxy.supabase.co/storage/v1/object/public/story-audio/";
+
+    const THUMB =
+      "https://ddsqgtiysfnxbltxrxxy.supabase.co/storage/v1/object/public/story-thumbnails/";
+
+    let audioUpdated = 0;
+    let thumbUpdated = 0;
+    let videoThumbUpdated = 0;
+
+    const stories = await db.select().from(audioStoriesTable);
+
+    for (const story of stories) {
+
+      const update: { audioUrl?: string; thumbnailUrl?: string } = {};
+
+      if (
+        story.audioUrl &&
+        story.audioUrl.startsWith("/api/media/files/")
+      ) {
+        update.audioUrl = AUDIO + story.audioUrl.split("/").pop();
+      }
+
+      if (
+        story.thumbnailUrl &&
+        story.thumbnailUrl.startsWith("/api/media/files/")
+      ) {
+        update.thumbnailUrl = THUMB + story.thumbnailUrl.split("/").pop();
+      }
+
+      if (Object.keys(update).length) {
+
+        await db
+          .update(audioStoriesTable)
+          .set(update)
+          .where(eq(audioStoriesTable.id, story.id));
+
+        if (update.audioUrl) audioUpdated++;
+        if (update.thumbnailUrl) thumbUpdated++;
+      }
+    }
+
+    const videos = await db.select().from(videosTable);
+
+    for (const video of videos) {
+
+      if (
+        video.thumbnailUrl &&
+        video.thumbnailUrl.startsWith("/api/media/files/")
+      ) {
+
+        await db
+          .update(videosTable)
+          .set({
+            thumbnailUrl:
+              THUMB + video.thumbnailUrl.split("/").pop(),
+          })
+          .where(eq(videosTable.id, video.id));
+
+        videoThumbUpdated++;
+      }
+    }
+
+    res.json({
+      success: true,
+      audioUpdated,
+      thumbUpdated,
+      videoThumbUpdated,
+    });
+
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({
+      success: false,
+      error: String(e),
+    });
+  }
+});
+
+
 
 export default router;
