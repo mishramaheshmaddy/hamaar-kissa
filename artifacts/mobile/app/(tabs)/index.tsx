@@ -94,7 +94,7 @@ export default function HomeScreen() {
     history,
   } = useAudio();
   const { user } = useAuth();
-  const { downloads } = useDownloads();
+
   const [searchQuery, setSearchQuery] = useState("");
 
   const [sections, setSections] = useState<HomeSectionItem[]>([]);
@@ -121,32 +121,6 @@ export default function HomeScreen() {
     })();
     return () => { cancelled = true; };
   }, []);
-
-
-  const continueListening = sections
-    .flatMap(s => s.items || [])
-    .filter(i => i.type === "audio")
-    .filter(i => history.includes(String(i.id)))
-    .sort((a,b)=>history.indexOf(String(a.id))-history.indexOf(String(b.id)))
-    .slice(0,5);
-
-
-
-  const recentDownloads = [...downloads]
-    .sort(
-      (a,b)=>
-        new Date(b.downloadedAt).getTime()-
-        new Date(a.downloadedAt).getTime()
-    )
-    .slice(0,5);
-
-
-
-  const recentlyPlayed = sections
-    .flatMap(s => s.items || [])
-    .filter(i => i.type === "audio")
-    .filter(i => history.includes(String(i.id)))
-    .slice(0,10);
 
 
   const renderSection = (section: HomeSectionItem) => {
@@ -274,109 +248,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-                />
-              </View>
-            )}
-
-            {recentDownloads.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader
-                  title="हाले डाउनलोड कइल"
-                  onSeeAll={() => router.push("/settings/downloads")}
-                />
-
-                <FlatList
-                  data={recentDownloads}
-                  horizontal
-                  keyExtractor={(item) => item.storyId}
-                  showsHorizontalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <AudioCard
-                      story={{
-                        id: item.storyId,
-                        title: item.title,
-                        category: item.category,
-                        categoryName: item.category,
-                        narrator: item.narrator,
-                        duration: item.duration,
-                        thumbnail: item.thumbnail,
-                        audioUrl: "",
-                        description: "",
-                      }}
-                      onPress={() => {
-                        playStory({
-                          id: item.storyId,
-                          title: item.title,
-                          category: item.category,
-                          categoryName: item.category,
-                          narrator: item.narrator,
-                          duration: item.duration,
-                          thumbnail: item.thumbnail,
-                          audioUrl: "",
-                          description: "",
-                        });
-                        router.push("/audio/player");
-                      }}
-                      isPlaying={
-                        currentStory?.id === item.storyId &&
-                        isPlaying
-                      }
-                    />
-                  )}
-                />
-              </View>
-            )}
-
-            {recentlyPlayed.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <SectionHeader
-                  title="हाले सुनल गइल"
-                  onSeeAll={() => router.push("/(tabs)/audio")}
-                />
-
-                <FlatList
-                  data={recentlyPlayed}
-                  horizontal
-                  keyExtractor={(item) => String(item.id)}
-                  showsHorizontalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <AudioCard
-                      story={{
-                        id: String(item.id),
-                        title: item.title,
-                        category: item.categoryName || "",
-                        categoryName: item.categoryName || "",
-                        narrator: item.narrator || "",
-                        duration: item.durationSeconds || 0,
-                        thumbnail: item.thumbnailUrl || "",
-                        audioUrl: item.audioUrl || "",
-                        description: "",
-                      }}
-                      onPress={() => {
-                        playStory({
-                          id: String(item.id),
-                          title: item.title,
-                          category: item.categoryName || "",
-                          categoryName: item.categoryName || "",
-                          narrator: item.narrator || "",
-                          duration: item.durationSeconds || 0,
-                          thumbnail: item.thumbnailUrl || "",
-                          audioUrl: item.audioUrl || "",
-                          description: "",
-                        });
-                        router.push("/audio/player");
-                      }}
-                      isPlaying={
-                        currentStory?.id === String(item.id) &&
-                        isPlaying
-                      }
-                    />
-                  )}
-                />
-              </View>
-            )}
-
-            {sections.map((section) => (
+{sections.map((section) => (
               <View key={section.id}>{renderSection(section)}</View>
             ))}
             {sections.length === 0 && (
