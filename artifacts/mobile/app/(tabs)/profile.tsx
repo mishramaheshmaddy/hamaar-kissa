@@ -20,7 +20,6 @@ import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 
-const logo = require("@/assets/images/logo.png");
 
 function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory {
   return {
@@ -90,7 +89,6 @@ export default function ProfileScreen() {
 
   const displayName = user?.name || user?.phone || "महेश बाहिन";
   const firstLetter = displayName.charAt(0).toUpperCase();
-  const joinedSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("hi-IN") : "मई 2024";
 
   useEffect(() => {
     (async () => {
@@ -136,19 +134,21 @@ export default function ProfileScreen() {
 
         {/* Header */}
         <View style={[styles.profileHeader, { paddingTop: topPadding + 12, backgroundColor: colors.card }]}>
-          <View style={styles.logoRow}>
-            <Image source={logo} style={styles.logoImg} contentFit="contain" />
-          </View>
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>{firstLetter}</Text>
+          <View style={styles.avatarWrapper}>
+            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <Text style={styles.avatarText}>{firstLetter}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.editAvatarBtn}
+              onPress={() => router.push("/settings/edit-profile")}
+            >
+              <Feather name="edit-2" size={14} color="#fff" />
+            </TouchableOpacity>
           </View>
           <Text style={[styles.name, { color: colors.foreground }]}>{displayName}</Text>
           <Text style={[styles.username, { color: colors.primary }]}>{user?.phone || "@hamaarkissa_user"}</Text>
-          <View style={styles.metaRow}>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>📍 {user?.location || "भोजपुरी"}</Text>
-            <Text style={[styles.metaDot, { color: colors.mutedForeground }]}>•</Text>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>🗓 {joinedSince} से</Text>
-          </View>
+
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, { color: colors.primary }]}>{history.length}</Text>
@@ -299,15 +299,33 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   profileHeader: { alignItems: "center", paddingHorizontal: 16, paddingBottom: 20 },
-  logoRow: { marginBottom: 12, marginTop: 4 },
   logoImg: { width: 80, height: 80 },
+
+  avatarWrapper:{
+    alignSelf:"center",
+    position:"relative",
+    marginTop:8,
+    marginBottom:8,
+  },
+
+  editAvatarBtn:{
+    position:"absolute",
+    bottom:4,
+    right:-2,
+    width:30,
+    height:30,
+    borderRadius:15,
+    backgroundColor:"#F05A28",
+    justifyContent:"center",
+    alignItems:"center",
+    borderWidth:2,
+    borderColor:"#fff",
+  },
+
   avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 12, borderWidth: 3, borderColor: "rgba(255,255,255,0.3)" },
   avatarText: { fontSize: 36, fontWeight: "900", color: "#fff" },
   name: { fontSize: 22, fontWeight: "800" },
   username: { fontSize: 14, fontWeight: "600", marginTop: 2 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  metaText: { fontSize: 12 },
-  metaDot: { fontSize: 12 },
   statsRow: { flexDirection: "row", alignItems: "center", marginTop: 20, gap: 24 },
   statItem: { alignItems: "center", gap: 2 },
   statNumber: { fontSize: 24, fontWeight: "900" },

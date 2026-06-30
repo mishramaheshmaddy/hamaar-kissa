@@ -396,7 +396,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         } catch {
           setIsPlaying(true);
         }
-      } catch (_e) {
+      } catch (e) {
+        console.error("AUDIO ERROR:", e);
+        console.log("Story:", story.title);
+        console.log("Audio URL:", uri);
         setIsPlaying(false);
       }
     },
