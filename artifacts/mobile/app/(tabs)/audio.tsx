@@ -99,7 +99,7 @@ export default function AudioScreen() {
             ]}
           >
             <Text style={[styles.tabText, { color: activeTab === tab ? colors.primary : colors.mutedForeground, fontWeight: activeTab === tab ? "700" : "500" }]}>
-              {tab === "all" ? "सब" : tab === "saved" ? "सेव कइल" : "पुरान"}
+              {tab === "all" ? "सब" : tab === "saved" ? "सेव कइल" : "सुनल"}
             </Text>
           </TouchableOpacity>
         ))}

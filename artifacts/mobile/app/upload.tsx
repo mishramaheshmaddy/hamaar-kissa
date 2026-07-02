@@ -139,8 +139,9 @@ export default function UploadScreen() {
       } else {
         Alert.alert("अपलोड विफल", "फिर से कोशिश करीं।");
       }
-    } catch {
-      Alert.alert("अपलोड विफल", "इंटरनेट कनेक्शन जाँचीं।");
+    } catch (e) {
+      console.error("UPLOAD ERROR:", e);
+      Alert.alert("अपलोड विफल", "अपलोड नहीं हो पाया। कृपया फिर से कोशिश करें।");
     } finally {
       setUploading(false);
       setUploadStep("idle");
@@ -165,8 +166,9 @@ export default function UploadScreen() {
       } else {
         Alert.alert("अपलोड विफल", "फिर से कोशिश करीं।");
       }
-    } catch {
-      Alert.alert("अपलोड विफल", "इंटरनेट कनेक्शन जाँचीं।");
+    } catch (e) {
+      console.error("UPLOAD ERROR:", e);
+      Alert.alert("अपलोड विफल", "अपलोड नहीं हो पाया। कृपया फिर से कोशिश करें।");
     } finally {
       setUploading(false);
       setUploadStep("idle");
@@ -175,7 +177,7 @@ export default function UploadScreen() {
 
   const handleSubmit = async () => {
     if (!user) {
-      Alert.alert("लॉगिन चाहीं", "अपनी कहानी अपलोड करे के लिए लॉगिन करीं।");
+      Alert.alert("लॉगिन जरूरी बा", "आपन कहानी भेजे खातिर पहिले लॉगिन करीं।");
       router.push("/login" as any);
       return;
     }

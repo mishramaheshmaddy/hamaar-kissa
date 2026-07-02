@@ -87,7 +87,7 @@ export default function ProfileScreen() {
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
-  const displayName = user?.name || user?.phone || "महेश बाहिन";
+  const displayName = user ? (user.name || "") : "";
   const firstLetter = displayName.charAt(0).toUpperCase();
 
   useEffect(() => {
@@ -139,15 +139,19 @@ export default function ProfileScreen() {
               <Text style={styles.avatarText}>{firstLetter}</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.editAvatarBtn}
-              onPress={() => router.push("/settings/edit-profile")}
-            >
-              <Feather name="edit-2" size={14} color="#fff" />
-            </TouchableOpacity>
+            {user && (
+              <TouchableOpacity
+                style={styles.editAvatarBtn}
+                onPress={() => router.push("/settings/edit-profile")}
+              >
+                <Feather name="edit-2" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={[styles.name, { color: colors.foreground }]}>{displayName}</Text>
-          <Text style={[styles.username, { color: colors.primary }]}>{user?.phone || "@hamaarkissa_user"}</Text>
+          {!!displayName && (
+            <Text style={[styles.name, { color: colors.foreground }]}>{displayName}</Text>
+          )}
+          <Text style={[styles.username, { color: colors.primary }]}>{user ? `@${(user as any).username || "hamaarkissa_user"}` : "@hamaarkissa_user"}</Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -193,7 +197,7 @@ export default function ProfileScreen() {
               style={[styles.tab, activeTab === tab && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
             >
               <Text style={[styles.tabText, { color: activeTab === tab ? colors.primary : colors.mutedForeground, fontWeight: activeTab === tab ? "700" : "500" }]}>
-                {tab === "saved" ? "🔖 सेव" : tab === "liked" ? "❤️ पसंद" : "🕐 पुरान"}
+                {tab === "saved" ? "🔖 सेव" : tab === "liked" ? "❤️ पसंद" : "🕐 सुनल"}
               </Text>
             </TouchableOpacity>
           ))}

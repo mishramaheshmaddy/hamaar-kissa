@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAudio } from "@/context/AudioContext";
 import { useColors } from "@/hooks/useColors";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
+import { useDownloads } from "@/hooks/useDownloads";
+import { downloadAudio, getFileSize } from "@/lib/downloadManager";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
@@ -70,6 +72,8 @@ export default function AudioPlayerScreen() {
     toggleSave,
   } = useAudio();
   const [showSpeeds, setShowSpeeds] = useState(false);
+  const { addDownload, removeDownload, isDownloaded } = useDownloads();
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
@@ -94,6 +98,8 @@ export default function AudioPlayerScreen() {
   const icon = CATEGORY_ICONS[currentStory.category] ?? "🎙️";
   const isLiked = likedStories.includes(currentStory.id);
   const isSaved = savedStories.includes(currentStory.id);
+  const downloaded = isDownloaded(currentStory.id);
+  const isDownloading = downloadProgress !== null;
 
   const fullAudioUrl = currentStory.audioUrl
   ? currentStory.audioUrl.startsWith("/")
@@ -117,22 +123,68 @@ async function handleShare() {
   }
 }
 
-  async function handleDownload() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  async function startDownload() {
     if (!currentStory) return;
-    if (Platform.OS === "web") {
-      Alert.alert("डाउनलोड", "Mobile app पर उपलब्ध बा।");
-      return;
-    }
     if (!fullAudioUrl) {
       Alert.alert("डाउनलोड", "इस कहानी के लिए ऑडियो उपलब्ध नइखे।");
       return;
     }
-    
-    Alert.alert(
-      "डाउनलोड",
-      "Player download integration अभी पूरा नहीं हुआ है। फिलहाल Home/Audio list से डाउनलोड करें।"
-    );
+
+    try {
+      setDownloadProgress(0);
+      const localPath = await downloadAudio(
+        currentStory.id,
+        fullAudioUrl,
+        (p: number) => setDownloadProgress(p)
+      );
+      const fileSize = await getFileSize(currentStory.id);
+      await addDownload({
+        storyId: currentStory.id,
+        title: currentStory.title,
+        thumbnail: currentStory.thumbnail,
+        duration: currentStory.duration,
+        category: currentStory.category,
+        narrator: currentStory.narrator,
+        localPath,
+        fileSize,
+        downloadedAt: new Date().toISOString(),
+      });
+      setDownloadProgress(null);
+      Alert.alert("✅", "डाउनलोड पूरा भइल!");
+    } catch (_e) {
+      setDownloadProgress(null);
+      Alert.alert("डाउनलोड फेल भइल।", "दोबारा कोशिश करीं।");
+    }
+  }
+
+  async function handleDownload() {
+    if (!currentStory) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    if (Platform.OS === "web") {
+      Alert.alert("डाउनलोड", "Mobile app पर उपलब्ध बा।");
+      return;
+    }
+
+    if (isDownloading) return;
+
+    if (downloaded) {
+      Alert.alert(
+        "डिलीट करीं?",
+        "डाउनलोड हटा दिया जाएगा।",
+        [
+          { text: "नाहीं", style: "cancel" },
+          {
+            text: "हाँ",
+            style: "destructive",
+            onPress: () => removeDownload(currentStory.id),
+          },
+        ]
+      );
+      return;
+    }
+
+    startDownload();
   }
 
   return (
@@ -210,9 +262,21 @@ async function handleShare() {
             <Text style={styles.actionLabel}>शेयर</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleDownload} style={styles.actionBtn}>
-            <Feather name="download" size={26} color="#fff" />
-            <Text style={styles.actionLabel}>डाउनलोड</Text>
+          <TouchableOpacity onPress={handleDownload} style={styles.actionBtn} disabled={isDownloading}>
+            {isDownloading ? (
+              <Text style={styles.downloadProgressText}>
+                {Math.round(downloadProgress ?? 0)}%
+              </Text>
+            ) : (
+              <Feather
+                name={downloaded ? "check-circle" : "download"}
+                size={26}
+                color={downloaded ? "#4CAF50" : "#fff"}
+              />
+            )}
+            <Text style={styles.actionLabel}>
+              {downloaded ? "डाउनलोडेड" : "डाउनलोड"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -396,6 +460,15 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", gap: 24, marginBottom: 28 },
   actionBtn: { alignItems: "center", gap: 5, padding: 8 },
   actionLabel: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "600" },
+  downloadProgressText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    width: 26,
+    height: 26,
+    textAlign: "center",
+    textAlignVertical: "center",
+  },
   progressSection: { width: "100%", marginBottom: 32, gap: 8 },
   progressBg: { height: 5, borderRadius: 3, position: "relative" },
   progressFill: { height: 5, borderRadius: 3, position: "absolute", left: 0, top: 0 },

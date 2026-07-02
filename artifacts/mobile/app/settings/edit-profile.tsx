@@ -116,7 +116,7 @@ setAvatar(user.avatarUrl ?? "");
   async function saveProfile(){
 
     if(!token){
-      Alert.alert("Error","Login required");
+      Alert.alert("लॉगिन जरूरी बा","प्रोफाइल Edit करे खातिर पहिले लॉगिन करीं।");
       return;
     }
 
@@ -345,7 +345,7 @@ color:usernameAvailable ? "green" : "#d32f2f"
         onChangeText={setDob}
       />
 
-      <Text style={styles.label}>उमिर</Text>
+      <Text style={styles.label}>उम्र</Text>
       <TextInput
         style={styles.input}
         keyboardType="numeric"
