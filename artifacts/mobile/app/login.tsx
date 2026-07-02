@@ -24,13 +24,14 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, sendOTP, verifyOTP, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<"select" | "phone" | "otp" | "name">("select");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState("");
+  const [confirmation, setConfirmation] = useState<any>(null);
   const otpInputRef = useRef<TextInput>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -39,19 +40,11 @@ export default function LoginScreen() {
     if (!phone.match(/^\d{10}$/)) return;
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/auth/send-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setMode("otp");
-        setTimeout(() => otpInputRef.current?.focus(), 300);
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
+      const result = await sendOTP(`+91${phone}`);
+      setConfirmation(result);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMode("otp");
+      setTimeout(() => otpInputRef.current?.focus(), 300);
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -60,26 +53,16 @@ export default function LoginScreen() {
   };
 
   const verifyOtp = async () => {
-    if (!otp.match(/^\d{6}$/)) return;
+    if (!otp.match(/^\d{6}$/) || !confirmation) return;
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp }),
-      });
-      const data = await res.json();
-      if (data.token) {
+      const data = await verifyOTP(confirmation, otp);
+      if (data.isNewUser) {
         setToken(data.token);
-        if (data.isNewUser) {
-          setMode("name");
-        } else {
-          await login(data.token, data.user);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
-        }
+        setMode("name");
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
       }
     } catch {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -112,10 +95,22 @@ export default function LoginScreen() {
   };
 
   const googleLogin = async () => {
-    // Placeholder: actual Google Sign-In requires expo-auth-session or expo-google-sign-in
-    // This will be documented for manual configuration
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    alert("Google Sign-In configure karein: Google Cloud Console me OAuth 2.0 Client ID banayein, com.haamarkissa.app ke liye.");
+    setLoading(true);
+    try {
+      const data = await signInWithGoogle();
+
+      if (data.isNewUser) {
+        setToken(data.token);
+        setMode("name");
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      }
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

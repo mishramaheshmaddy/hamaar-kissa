@@ -340,18 +340,6 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
               <Feather name="download" size={14} color={colors.mutedForeground} />
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleMoreMenu}
-            style={styles.actionBtn}
-          >
-            <Feather
-              name="more-vertical"
-              size={14}
-              color={colors.mutedForeground}
-            />
-          </TouchableOpacity>
-
         </View>
 
         <View style={styles.footer}>

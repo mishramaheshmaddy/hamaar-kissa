@@ -16,6 +16,12 @@ export interface AuthUser {
   location?: string | null;
 }
 
+interface FirebaseAuthResult {
+  token: string;
+  user: AuthUser;
+  isNewUser?: boolean;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
@@ -24,8 +30,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
   sendOTP: (phone: string) => Promise<any>;
-  verifyOTP: (confirmation: any, otp: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  verifyOTP: (confirmation: any, otp: string) => Promise<FirebaseAuthResult>;
+  signInWithGoogle: () => Promise<FirebaseAuthResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,14 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem("hk_user");
   };
 
-  // Send OTP via Firebase Phone Auth
+  // Send OTP via Firebase Phone Auth. `phone` must be in E.164 format (e.g. +919876543210)
   const sendOTP = async (phone: string) => {
     const confirmation = await auth().signInWithPhoneNumber(phone);
     return confirmation;
   };
 
-  // Verify OTP and login to backend
-  const verifyOTP = async (confirmation: any, otp: string) => {
+  // Exchange a Firebase phone-auth token for a backend session.
+  // Skips the backend login() call if the user is new so the caller can
+  // collect a name first, then call login() itself.
+  const verifyOTP = async (confirmation: any, otp: string): Promise<FirebaseAuthResult> => {
     const result = await confirmation.confirm(otp);
     const firebaseToken = await result.user.getIdToken();
     const res = await fetch(`${BASE}/api/auth/firebase`, {
@@ -97,12 +105,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ firebaseToken }),
     });
     if (!res.ok) throw new Error("Backend auth failed");
-    const data = await res.json();
-    await login(data.token, data.user);
+    const data: FirebaseAuthResult = await res.json();
+    if (!data.isNewUser) {
+      await login(data.token, data.user);
+    }
+    return data;
   };
 
-  // Google Sign In
-  const signInWithGoogle = async () => {
+  // Google Sign In via Firebase
+  const signInWithGoogle = async (): Promise<FirebaseAuthResult> => {
     const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
     GoogleSignin.configure({
       webClientId: "980779060644-3imt0epjlh3i2ubshu0rj8tsi8do8i8c.apps.googleusercontent.com",
@@ -118,8 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ firebaseToken }),
     });
     if (!res.ok) throw new Error("Backend auth failed");
-    const data = await res.json();
+    const data: FirebaseAuthResult = await res.json();
     await login(data.token, data.user);
+    return data;
   };
 
   return (

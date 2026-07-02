@@ -44,6 +44,8 @@ router.post("/auth/firebase", async (req, res) => {
       user = existing[0] ?? null;
     }
 
+    const isNewUser = !user;
+
     if (!user) {
       const inserted = await db.insert(usersTable).values({
         name,
@@ -69,6 +71,7 @@ router.post("/auth/firebase", async (req, res) => {
         createdAt: user.createdAt,
         location: user.location ?? null,
       },
+      isNewUser,
     });
   } catch (err) {
     console.error("Firebase auth error:", err);
