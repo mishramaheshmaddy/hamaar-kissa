@@ -27,10 +27,14 @@ function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory 
     categoryId: s.categoryId ?? undefined,
     categoryName: s.categoryName ?? undefined,
     duration: s.durationSeconds,
-    thumbnail: s.thumbnailUrl ? `${BASE}${s.thumbnailUrl}` : "",
+    thumbnail: s.thumbnailUrl
+      ? (s.thumbnailUrl.startsWith("/") ? `${BASE}${s.thumbnailUrl}` : s.thumbnailUrl)
+      : "",
     narrator: s.narrator,
     description: s.description,
-    audioUrl: `${BASE}${s.audioUrl}`,
+    audioUrl: s.audioUrl
+      ? (s.audioUrl.startsWith("/") ? `${BASE}${s.audioUrl}` : s.audioUrl)
+      : "",
   };
 }
 
