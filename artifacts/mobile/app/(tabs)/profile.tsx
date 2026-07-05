@@ -181,6 +181,17 @@ export default function ProfileScreen() {
             style={[styles.uploadCTA, { backgroundColor: colors.primary }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              if (!user) {
+                Alert.alert(
+                  "लॉगिन जरूरी बा",
+                  "आपन कहानी भेजे खातिर पहिले लॉगिन करीं।",
+                  [
+                    { text: "बाद में", style: "cancel" },
+                    { text: "Login करीं", onPress: () => router.push("/login" as any) },
+                  ]
+                );
+                return;
+              }
               router.push("/upload" as any);
             }}
             activeOpacity={0.85}
