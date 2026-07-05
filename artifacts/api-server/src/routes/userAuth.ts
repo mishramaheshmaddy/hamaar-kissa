@@ -1,12 +1,17 @@
 import { Router } from "express";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, or } from "drizzle-orm";
 import { db, usersTable, otpVerificationsTable } from "@workspace/db";
 import { sign, verify } from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 
 const router = Router();
 
 const JWT_SECRET = process.env["JWT_SECRET"] || "hamaar-kissa-jwt-secret";
 const SMS_API_KEY = process.env["SMS_API_KEY"];
+const GOOGLE_WEB_CLIENT_ID =
+  process.env["GOOGLE_WEB_CLIENT_ID"] ??
+  "980779060644-3imt0epjlh3i2ubshu0rj8tsi8do8i8c.apps.googleusercontent.com";
+const googleClient = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
 function generateToken(userId: number): string {
   return sign({ userId }, JWT_SECRET, { expiresIn: "30d" });
@@ -123,49 +128,59 @@ router.post("/auth/verify-otp", async (req, res) => {
 });
 
 router.post("/auth/google", async (req, res) => {
-  const { idToken, name, email, photo } = req.body as {
+  const { idToken } = req.body as {
     idToken?: string;
-    name?: string;
-    email?: string;
-    photo?: string;
   };
   if (!idToken) {
     res.status(400).json({ error: "Google ID token required" });
     return;
   }
 
-  let googleId = "";
   try {
-    const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64").toString());
-    googleId = payload.sub || payload.user_id || "";
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: GOOGLE_WEB_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const googleId = payload?.sub;
+    const email = payload?.email ?? null;
+
+    if (!googleId || !email || payload?.email_verified !== true) {
+      res.status(401).json({ error: "Google account could not be verified" });
+      return;
+    }
+
+    let [user] = await db
+      .select()
+      .from(usersTable)
+      .where(or(eq(usersTable.googleId, googleId), eq(usersTable.email, email)))
+      .limit(1);
+    const isNewUser = !user;
+
+    if (!user) {
+      [user] = await db.insert(usersTable).values({
+        name: payload.name ?? "",
+        email,
+        avatarUrl: payload.picture ?? null,
+        authProvider: "google",
+        googleId,
+      }).returning();
+    } else {
+      [user] = await db.update(usersTable).set({
+        googleId,
+        name: payload.name || user.name,
+        email,
+        avatarUrl: payload.picture || user.avatarUrl,
+        authProvider: "google",
+        updatedAt: new Date(),
+      }).where(eq(usersTable.id, user.id)).returning();
+    }
+
+    const token = generateToken(user.id);
+    res.json({ token, user: toUserDto(user), isNewUser });
   } catch {
-    res.status(400).json({ error: "Invalid token" });
-    return;
+    res.status(401).json({ error: "Invalid Google ID token" });
   }
-
-  let [user] = await db.select().from(usersTable).where(eq(usersTable.googleId, googleId));
-  const isNewUser = !user;
-  if (!user) {
-    const [newUser] = await db.insert(usersTable).values({
-      name: name || "",
-      email: email || null,
-      avatarUrl: photo || null,
-      authProvider: "google",
-      googleId,
-    }).returning();
-    user = newUser;
-  } else if (name || email || photo) {
-    const [updated] = await db.update(usersTable).set({
-      name: name || user.name,
-      email: email || user.email,
-      avatarUrl: photo || user.avatarUrl,
-      updatedAt: new Date(),
-    }).where(eq(usersTable.id, user.id)).returning();
-    user = updated;
-  }
-
-  const token = generateToken(user.id);
-  res.json({ token, user: toUserDto(user), isNewUser });
 });
 
 router.get("/auth/me", async (req, res, next) => {

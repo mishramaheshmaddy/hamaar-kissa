@@ -92,7 +92,7 @@ export default function ProfileScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const displayName = user ? (user.name || "") : "";
-  const firstLetter = displayName.charAt(0).toUpperCase();
+  const firstLetter = (displayName || user?.phone || "?").charAt(0).toUpperCase();
 
   useEffect(() => {
     (async () => {
@@ -117,7 +117,7 @@ export default function ProfileScreen() {
         });
         if (res.ok) {
           const data = await res.json();
-          setMySubmissions(data.submissions || []);
+          setMySubmissions(Array.isArray(data) ? data : data.submissions || []);
         }
       } catch {}
     })();
@@ -140,17 +140,19 @@ export default function ProfileScreen() {
         <View style={[styles.profileHeader, { paddingTop: topPadding + 12, backgroundColor: colors.card }]}>
           <View style={styles.avatarWrapper}>
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.avatarText}>{firstLetter}</Text>
+              {user?.avatarUrl ? (
+                <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} contentFit="cover" />
+              ) : (
+                <Text style={styles.avatarText}>{firstLetter}</Text>
+              )}
             </View>
 
-            {user && (
-              <TouchableOpacity
-                style={styles.editAvatarBtn}
-                onPress={() => router.push("/settings/edit-profile")}
-              >
-                <Feather name="edit-2" size={14} color="#fff" />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.editAvatarBtn}
+              onPress={() => router.push(user ? "/settings/edit-profile" : "/login")}
+            >
+              <Feather name="edit-2" size={14} color="#fff" />
+            </TouchableOpacity>
           </View>
           {!!displayName && (
             <Text style={[styles.name, { color: colors.foreground }]}>{displayName}</Text>
@@ -331,6 +333,7 @@ const styles = StyleSheet.create({
   },
 
   avatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 12, borderWidth: 3, borderColor: "rgba(255,255,255,0.3)" },
+  avatarImage: { width: "100%", height: "100%", borderRadius: 44 },
   avatarText: { fontSize: 36, fontWeight: "900", color: "#fff" },
   name: { fontSize: 22, fontWeight: "800" },
   username: { fontSize: 14, fontWeight: "600", marginTop: 2 },

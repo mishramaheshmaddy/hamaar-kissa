@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAudio } from "@/context/AudioContext";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 import { useDownloads } from "@/hooks/useDownloads";
@@ -71,9 +72,27 @@ export default function AudioPlayerScreen() {
     toggleLike,
     toggleSave,
   } = useAudio();
+  const { user } = useAuth();
   const [showSpeeds, setShowSpeeds] = useState(false);
   const { addDownload, removeDownload, isDownloaded } = useDownloads();
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+
+  // Login check helper — mirrors AudioCard's requireLogin so Player and
+  // Home/Category screens gate Like/Save/Download identically.
+  const requireLogin = (action: () => void) => {
+    if (!user) {
+      Alert.alert(
+        "लॉगिन करीं 🙏",
+        "इ feature के use करे खातिर पहिले login करीं।",
+        [
+          { text: "बाद में", style: "cancel" },
+          { text: "Login करीं", onPress: () => router.push("/login" as any) },
+        ]
+      );
+      return;
+    }
+    action();
+  };
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
@@ -151,40 +170,43 @@ async function handleShare() {
       });
       setDownloadProgress(null);
       Alert.alert("✅", "डाउनलोड पूरा भइल!");
-    } catch (_e) {
+    } catch (e) {
+      console.error("startDownload error:", e, "url:", fullAudioUrl);
       setDownloadProgress(null);
-      Alert.alert("डाउनलोड फेल भइल।", "दोबारा कोशिश करीं।");
+      Alert.alert("डाउनलोड फेल भइल।", `दोबारा कोशिश करीं। (${(e as any)?.message ?? e})`);
     }
   }
 
   async function handleDownload() {
     if (!currentStory) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    requireLogin(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (Platform.OS === "web") {
-      Alert.alert("डाउनलोड", "Mobile app पर उपलब्ध बा।");
-      return;
-    }
+      if (Platform.OS === "web") {
+        Alert.alert("डाउनलोड", "Mobile app पर उपलब्ध बा।");
+        return;
+      }
 
-    if (isDownloading) return;
+      if (isDownloading) return;
 
-    if (downloaded) {
-      Alert.alert(
-        "डिलीट करीं?",
-        "डाउनलोड हटा दिया जाएगा।",
-        [
-          { text: "नाहीं", style: "cancel" },
-          {
-            text: "हाँ",
-            style: "destructive",
-            onPress: () => removeDownload(currentStory.id),
-          },
-        ]
-      );
-      return;
-    }
+      if (downloaded) {
+        Alert.alert(
+          "डिलीट करीं?",
+          "डाउनलोड हटा दिया जाएगा।",
+          [
+            { text: "नाहीं", style: "cancel" },
+            {
+              text: "हाँ",
+              style: "destructive",
+              onPress: () => removeDownload(currentStory.id),
+            },
+          ]
+        );
+        return;
+      }
 
-    startDownload();
+      startDownload();
+    });
   }
 
   return (
@@ -236,10 +258,10 @@ async function handleShare() {
         {/* Like / Save / Share / Download */}
         <View style={styles.actionRow}>
           <TouchableOpacity
-            onPress={() => {
+            onPress={() => requireLogin(() => {
               toggleLike(currentStory.id);
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
+            })}
             style={styles.actionBtn}
           >
             <Feather name="heart" size={26} color={isLiked ? "#FF4444" : "#fff"} />
@@ -247,10 +269,10 @@ async function handleShare() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
+            onPress={() => requireLogin(() => {
               toggleSave(currentStory.id);
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            }}
+            })}
             style={styles.actionBtn}
           >
             <Feather name="bookmark" size={26} color={isSaved ? "#F5A623" : "#fff"} />

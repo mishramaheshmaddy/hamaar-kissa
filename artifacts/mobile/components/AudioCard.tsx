@@ -180,7 +180,8 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
       });
       Alert.alert("✅", "डाउनलोड पूरा भइल!");
     } catch (e) {
-      Alert.alert("Error", "डाउनलोड फेल भइल। दोबारा कोशिश करीं।");
+      console.error("AudioCard download error:", e, "url:", story.audioUrl);
+      Alert.alert("Error", `डाउनलोड फेल भइल। दोबारा कोशिश करीं। (${(e as any)?.message ?? e})`);
     } finally {
       setDownloading(false);
       setDownloadProgress(0);

@@ -80,7 +80,8 @@ export default function UploadScreen() {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         setThumbnailUri(asset.uri);
-        await uploadFileFromUri(asset.uri, "thumbnailUrl");
+        const filename = asset.fileName ?? asset.uri.split("/").pop() ?? "thumbnail.jpg";
+        await uploadFileFromUri(asset.uri, "thumbnailUrl", asset.mimeType ?? "image/jpeg", filename);
       }
     }
   };
@@ -114,8 +115,9 @@ export default function UploadScreen() {
           return;
         }
         setAudioName(asset.name);
-        await uploadFileFromUri(asset.uri, "audioUrl");
-      } catch {
+        await uploadFileFromUri(asset.uri, "audioUrl", asset.mimeType ?? "audio/mpeg", asset.name);
+      } catch (err) {
+        console.error("pickAudio error:", err);
         Alert.alert("Error", "ऑडियो pick करे में दिक्कत भइल।");
       }
     }
@@ -148,27 +150,40 @@ export default function UploadScreen() {
     }
   };
 
-  const uploadFileFromUri = async (uri: string, field: "audioUrl" | "thumbnailUrl") => {
+  const uploadFileFromUri = async (
+    uri: string,
+    field: "audioUrl" | "thumbnailUrl",
+    mimeType?: string | null,
+    fileName?: string | null
+  ) => {
     setUploading(true);
     setUploadStep(field === "thumbnailUrl" ? "thumbnail" : "audio");
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const filename = uri.split("/").pop() ?? "upload.jpg";
-      const file = new File([blob], filename, { type: blob.type });
+      const filename =
+        fileName ?? uri.split("/").pop() ?? (field === "thumbnailUrl" ? "upload.jpg" : "upload.mp3");
+      const type = mimeType ?? (field === "thumbnailUrl" ? "image/jpeg" : "audio/mpeg");
+
+      // React Native's FormData expects { uri, name, type } for local files —
+      // NOT a web Blob/File object (File is not defined on native/Hermes).
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", {
+        uri,
+        name: filename,
+        type,
+      } as any);
+
       const res = await fetch(`${BASE}/api/media/upload`, { method: "POST", body: formData });
       const data = await res.json();
       if (data.url) {
         if (field === "thumbnailUrl") setThumbnailUrl(data.url);
         else setAudioUrl(data.url);
       } else {
-        Alert.alert("अपलोड विफल", "फिर से कोशिश करीं।");
+        console.error("uploadFileFromUri: no url in response:", data);
+        Alert.alert("अपलोड विफल", data?.error ? String(data.error) : "फिर से कोशिश करीं।");
       }
     } catch (e) {
-      console.error("UPLOAD ERROR:", e);
-      Alert.alert("अपलोड विफल", "अपलोड नहीं हो पाया। कृपया फिर से कोशिश करें।");
+      console.error("UPLOAD ERROR (native):", e, "uri:", uri);
+      Alert.alert("अपलोड विफल", `अपलोड नहीं हो पाया। कृपया फिर से कोशिश करें। (${(e as any)?.message ?? e})`);
     } finally {
       setUploading(false);
       setUploadStep("idle");
@@ -212,8 +227,9 @@ export default function UploadScreen() {
       }
       setSuccess(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Alert.alert("विफल", "सबमिट करने में समस्या हुई। फिर से कोशिश करीं।");
+    } catch (err) {
+      console.error("handleSubmit error:", err);
+      Alert.alert("विफल", `सबमिट करने में समस्या हुई। फिर से कोशिश करीं। (${(err as any)?.message ?? err})`);
     } finally {
       setUploading(false);
       setUploadStep("idle");

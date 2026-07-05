@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import React, { useState, useRef } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,9 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
-const BASE = DOMAIN ? `https://${DOMAIN}` : "";
+import { BASE } from "@/lib/api";
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -45,8 +44,9 @@ export default function LoginScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setMode("otp");
       setTimeout(() => otpInputRef.current?.focus(), 300);
-    } catch {
+    } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("OTP नहीं भेजा जा सका", error instanceof Error ? error.message : "फिर से कोशिश करीं।");
     } finally {
       setLoading(false);
     }
@@ -64,8 +64,9 @@ export default function LoginScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
       }
-    } catch {
+    } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("OTP गलत बा", error instanceof Error ? error.message : "फिर से कोशिश करीं।");
     } finally {
       setLoading(false);
     }
@@ -87,8 +88,9 @@ export default function LoginScreen() {
       await login(token, data);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-    } catch {
+    } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Google Login विफल", error instanceof Error ? error.message : "फिर से कोशिश करीं।");
     } finally {
       setLoading(false);
     }
@@ -98,7 +100,6 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const data = await signInWithGoogle();
-
       if (data.isNewUser) {
         setToken(data.token);
         setMode("name");
@@ -106,8 +107,9 @@ export default function LoginScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
       }
-    } catch {
+    } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Google Login विफल", error instanceof Error ? error.message : "फिर से कोशिश करीं।");
     } finally {
       setLoading(false);
     }

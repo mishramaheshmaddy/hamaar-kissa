@@ -1,9 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import auth from "@react-native-firebase/auth";
-
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
-const BASE = DOMAIN ? `https://${DOMAIN}` : "";
+import { BASE } from "@/lib/api";
 
 export interface AuthUser {
   id: number;
@@ -12,6 +10,9 @@ export interface AuthUser {
   phone: string | null;
   avatarUrl: string | null;
   authProvider: string;
+  username?: string | null;
+  dateOfBirth?: string | null;
+  age?: number | null;
   createdAt?: string | null;
   location?: string | null;
 }
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // collect a name first, then call login() itself.
   const verifyOTP = async (confirmation: any, otp: string): Promise<FirebaseAuthResult> => {
     const result = await confirmation.confirm(otp);
+    if (!result?.user) throw new Error("OTP verification did not return a user");
     const firebaseToken = await result.user.getIdToken();
     const res = await fetch(`${BASE}/api/auth/firebase`, {
       method: "POST",
@@ -106,13 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (!res.ok) throw new Error("Backend auth failed");
     const data: FirebaseAuthResult = await res.json();
-    if (!data.isNewUser) {
-      await login(data.token, data.user);
-    }
+    await login(data.token, data.user);
     return data;
   };
 
-  // Google Sign In via Firebase
+  // Google Sign-In is verified by the API using Google's public signing keys.
+  // This avoids a second native Firebase credential exchange after the account
+  // picker, which was returning users to Login when that exchange failed.
   const signInWithGoogle = async (): Promise<FirebaseAuthResult> => {
     const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
     GoogleSignin.configure({
@@ -120,13 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
-    const googleCredential = auth.GoogleAuthProvider.credential(userInfo.data?.idToken ?? "");
-    const result = await auth().signInWithCredential(googleCredential);
-    const firebaseToken = await result.user.getIdToken();
-    const res = await fetch(`${BASE}/api/auth/firebase`, {
+    const idToken = userInfo.data?.idToken;
+    if (!idToken) throw new Error("Google Sign-In did not return an ID token");
+
+    const res = await fetch(`${BASE}/api/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firebaseToken }),
+      body: JSON.stringify({ idToken }),
     });
     if (!res.ok) throw new Error("Backend auth failed");
     const data: FirebaseAuthResult = await res.json();
