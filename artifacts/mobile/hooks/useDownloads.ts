@@ -16,25 +16,38 @@ export interface DownloadedStory {
 }
 
 let db: SQLite.SQLiteDatabase | null = null;
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync("hamaar_kissa_downloads.db");
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS downloads (
-        storyId TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        thumbnail TEXT,
-        duration INTEGER,
-        category TEXT,
-        narrator TEXT,
-        localPath TEXT NOT NULL,
-        fileSize INTEGER,
-        downloadedAt TEXT NOT NULL
-      );
-    `);
+  if (db) return db;
+  // Multiple components (e.g. every AudioCard in a list) call getDb() on
+  // mount at roughly the same time. Without caching the in-flight promise,
+  // each one sees db === null and calls openDatabaseAsync() concurrently,
+  // which corrupts the native SQLite handle and causes
+  // "NativeDatabase.prepareAsync ... NullPointerException" errors.
+  // Caching the promise ensures concurrent callers all await the same
+  // single open+setup operation instead of racing.
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      const database = await SQLite.openDatabaseAsync("hamaar_kissa_downloads.db");
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS downloads (
+          storyId TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          thumbnail TEXT,
+          duration INTEGER,
+          category TEXT,
+          narrator TEXT,
+          localPath TEXT NOT NULL,
+          fileSize INTEGER,
+          downloadedAt TEXT NOT NULL
+        );
+      `);
+      db = database;
+      return database;
+    })();
   }
-  return db;
+  return dbPromise;
 }
 
 export function useDownloads() {
