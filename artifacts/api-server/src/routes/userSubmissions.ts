@@ -64,7 +64,13 @@ router.get("/submissions/:id", async (req, res) => {
 
 router.patch("/submissions/:id/approve", async (req, res) => {
   const id = Number(req.params.id);
-  const { categoryId, narrator } = req.body as { categoryId?: number; narrator?: string };
+  const { categoryId, narrator, title, description, durationSeconds } = req.body as {
+    categoryId?: number;
+    narrator?: string;
+    title?: string;
+    description?: string;
+    durationSeconds?: number;
+  };
   if (!categoryId) {
     res.status(400).json({ error: "categoryId is required to approve a submission" });
     return;
@@ -72,15 +78,19 @@ router.patch("/submissions/:id/approve", async (req, res) => {
   const [submission] = await db.select().from(userSubmissionsTable).where(eq(userSubmissionsTable.id, id));
   if (!submission) { res.status(404).json({ error: "Not found" }); return; }
 
+  const finalTitle = title?.trim() || submission.title;
+  const finalDescription = description !== undefined ? description : submission.description;
+  const finalDuration = typeof durationSeconds === "number" && durationSeconds >= 0 ? durationSeconds : submission.durationSeconds;
+
   const [category] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, categoryId));
   const categoryLabel = category?.label || "";
 
   await db.insert(audioStoriesTable).values({
-    title: submission.title,
-    description: submission.description,
+    title: finalTitle,
+    description: finalDescription,
     audioUrl: submission.audioUrl,
     thumbnailUrl: submission.thumbnailUrl ?? null,
-    durationSeconds: submission.durationSeconds,
+    durationSeconds: finalDuration,
     published: true,
     categoryId,
     narrator: narrator ?? "",
@@ -90,6 +100,9 @@ router.patch("/submissions/:id/approve", async (req, res) => {
   const [row] = await db.update(userSubmissionsTable).set({
     status: "approved",
     categoryId,
+    title: finalTitle,
+    description: finalDescription,
+    durationSeconds: finalDuration,
     adminNotes: categoryLabel
       ? `आपके अपलोड कइल कहानी स्वीकृत हो गइल बा आउर "${categoryLabel}" श्रेणी में उपलब्ध बा।`
       : `आपके अपलोड कइल कहानी स्वीकृत हो गइल बा आउर एप में उपलब्ध बा।`,
