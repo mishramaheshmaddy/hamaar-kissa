@@ -8,6 +8,8 @@ export const userSubmissionsTable = pgTable("user_submissions", {
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   audioUrl: text("audio_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  categoryId: integer("category_id"),
   fileSize: integer("file_size"),
   durationSeconds: integer("duration_seconds").notNull().default(0),
   status: text("status").notNull().default("pending"),

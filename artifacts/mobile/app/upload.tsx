@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -42,6 +43,7 @@ export default function UploadScreen() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [audioName, setAudioName] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [durationSeconds, setDurationSeconds] = useState<number>(0);
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<"idle" | "thumbnail" | "audio" | "saving">("idle");
   const [success, setSuccess] = useState(false);
@@ -86,6 +88,34 @@ export default function UploadScreen() {
     }
   };
 
+  const measureAudioDurationNative = async (uri: string) => {
+    try {
+      const { sound, status } = await Audio.Sound.createAsync({ uri }, { shouldPlay: false });
+      if (status.isLoaded && status.durationMillis) {
+        setDurationSeconds(Math.round(status.durationMillis / 1000));
+      }
+      await sound.unloadAsync();
+    } catch (err) {
+      console.error("measureAudioDurationNative error:", err);
+    }
+  };
+
+  const measureAudioDurationWeb = (file: File) => {
+    try {
+      const audioEl = document.createElement("audio");
+      audioEl.preload = "metadata";
+      audioEl.onloadedmetadata = () => {
+        if (isFinite(audioEl.duration)) {
+          setDurationSeconds(Math.round(audioEl.duration));
+        }
+        URL.revokeObjectURL(audioEl.src);
+      };
+      audioEl.src = URL.createObjectURL(file);
+    } catch (err) {
+      console.error("measureAudioDurationWeb error:", err);
+    }
+  };
+
   const pickAudio = async () => {
     if (Platform.OS === "web") {
       const input = document.createElement("input");
@@ -99,6 +129,7 @@ export default function UploadScreen() {
           return;
         }
         setAudioName(file.name);
+        measureAudioDurationWeb(file);
         await uploadFile(file, "audioUrl");
       };
       input.click();
@@ -115,6 +146,7 @@ export default function UploadScreen() {
           return;
         }
         setAudioName(asset.name);
+        await measureAudioDurationNative(asset.uri);
         await uploadFileFromUri(asset.uri, "audioUrl", asset.mimeType ?? "audio/mpeg", asset.name);
       } catch (err) {
         console.error("pickAudio error:", err);
@@ -218,6 +250,7 @@ export default function UploadScreen() {
           categoryId,
           audioUrl,
           thumbnailUrl: thumbnailUrl ?? "",
+          durationSeconds,
         }),
       });
       if (!res.ok) {

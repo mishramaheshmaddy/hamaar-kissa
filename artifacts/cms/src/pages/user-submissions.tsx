@@ -12,6 +12,8 @@ interface Submission {
   title: string;
   description: string;
   audioUrl: string;
+  thumbnailUrl: string | null;
+  categoryId: number | null;
   fileSize: number | null;
   durationSeconds: number;
   status: string;
@@ -20,8 +22,16 @@ interface Submission {
   updatedAt: string;
 }
 
+interface Category {
+  id: number;
+  label: string;
+  type: string;
+}
+
 export default function UserSubmissions() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [rejectModal, setRejectModal] = useState<{ open: boolean; id: number | null; reason: string }>({ open: false, id: null, reason: "" });
@@ -40,17 +50,42 @@ export default function UserSubmissions() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/categories", { credentials: "include" });
+      const data = await res.json();
+      setCategories(data.filter((c: Category) => c.type === "audio" || c.type === "both"));
+    } catch {
+      toast({ title: "Failed to load categories", variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     fetchSubmissions();
+    fetchCategories();
   }, []);
 
   const handleApprove = async (id: number) => {
+    const categoryId = selectedCategory[id];
+    if (!categoryId) {
+      toast({ title: "पहिले category चुनीं", description: "Approve करे से पहिले एक category select करीं।", variant: "destructive" });
+      return;
+    }
     try {
-      await fetch(`/api/submissions/${id}/approve`, { method: "PATCH", credentials: "include" });
-      toast({ title: "Approved" });
+      const res = await fetch(`/api/submissions/${id}/approve`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Approve failed");
+      }
+      toast({ title: "Approved", description: "Story published to the app." });
       fetchSubmissions();
-    } catch {
-      toast({ title: "Failed", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
     }
   };
 
@@ -139,19 +174,48 @@ export default function UserSubmissions() {
               {filtered.map((sub) => (
                 <div key={sub.id} className="p-4 hover:bg-muted/50 transition-colors">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-lg">{sub.title}</h3>
-                        {statusBadge(sub.status)}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        By {sub.userName || sub.userPhone || "Unknown"} • Duration: {sub.durationSeconds}s
-                        {sub.fileSize ? ` • Size: ${(sub.fileSize / 1024 / 1024).toFixed(1)} MB` : ""}
-                      </p>
-                      {sub.adminNotes && (
-                        <p className="text-sm text-red-600 mb-2">Note: {sub.adminNotes}</p>
+                    <div className="flex-1 flex gap-3">
+                      {sub.thumbnailUrl ? (
+                        <img
+                          src={sub.thumbnailUrl}
+                          alt={sub.title}
+                          className="w-16 h-16 rounded-md object-cover flex-shrink-0 bg-muted"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-md flex-shrink-0 bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                          No image
+                        </div>
                       )}
-                      <audio controls src={sub.audioUrl} className="w-full max-w-md h-8" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-lg">{sub.title}</h3>
+                          {statusBadge(sub.status)}
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          By {sub.userName || sub.userPhone || "Unknown"} • Duration: {sub.durationSeconds}s
+                          {sub.fileSize ? ` • Size: ${(sub.fileSize / 1024 / 1024).toFixed(1)} MB` : ""}
+                        </p>
+                        {sub.adminNotes && (
+                          <p className="text-sm text-red-600 mb-2">Note: {sub.adminNotes}</p>
+                        )}
+                        <audio controls src={sub.audioUrl} className="w-full max-w-md h-8 mb-2" />
+                        {sub.status === "pending" && (
+                          <select
+                            className="border rounded-md px-2 py-1 text-sm w-full max-w-xs"
+                            value={selectedCategory[sub.id] ?? sub.categoryId ?? ""}
+                            onChange={(e) =>
+                              setSelectedCategory({ ...selectedCategory, [sub.id]: Number(e.target.value) })
+                            }
+                          >
+                            <option value="">Select a category…</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2 ml-4">
                       {sub.status === "pending" && (

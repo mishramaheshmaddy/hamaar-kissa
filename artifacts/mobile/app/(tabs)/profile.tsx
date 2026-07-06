@@ -85,9 +85,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { savedStories, likedStories, history, playStory, currentStory, isPlaying, sleepTimerMinutes } = useAudio();
   const { user, token, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<"saved" | "liked" | "history">("saved");
+  const [activeTab, setActiveTab] = useState<"saved" | "liked" | "history" | "submissions">("saved");
   const [allStories, setAllStories] = useState<AudioStory[]>([]);
-  const [mySubmissions, setMySubmissions] = useState<Array<{ id: number; title: string; status: string; createdAt: string }>>([]);
+  const [mySubmissions, setMySubmissions] = useState<Array<{ id: number; title: string; status: string; adminNotes: string | null; createdAt: string }>>([]);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
@@ -119,7 +119,9 @@ export default function ProfileScreen() {
           const data = await res.json();
           setMySubmissions(Array.isArray(data) ? data : data.submissions || []);
         }
-      } catch {}
+      } catch (err) {
+        console.error("fetch mySubmissions error:", err);
+      }
     })();
   }, [token]);
 
@@ -207,14 +209,14 @@ export default function ProfileScreen() {
 
         {/* Tabs */}
         <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
-          {(["saved", "liked", "history"] as const).map((tab) => (
+          {(["saved", "liked", "history", ...(user && mySubmissions.length > 0 ? ["submissions" as const] : [])]).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
               style={[styles.tab, activeTab === tab && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
             >
               <Text style={[styles.tabText, { color: activeTab === tab ? colors.primary : colors.mutedForeground, fontWeight: activeTab === tab ? "700" : "500" }]}>
-                {tab === "saved" ? "🔖 सेव" : tab === "liked" ? "❤️ पसंद" : "🕐 सुनल"}
+                {tab === "saved" ? "🔖 सेव" : tab === "liked" ? "❤️ पसंद" : tab === "history" ? "🕐 सुनल" : "📤 मेरा सबमिशन"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -222,7 +224,39 @@ export default function ProfileScreen() {
 
         {/* Content List */}
         <View style={styles.content}>
-          {activeItems.length === 0 ? (
+          {activeTab === "submissions" ? (
+            mySubmissions.map((sub) => (
+              <View
+                key={sub.id}
+                style={{
+                  padding: 12,
+                  marginHorizontal: 16,
+                  marginBottom: 8,
+                  borderRadius: 10,
+                  backgroundColor: colors.card,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontWeight: "700", color: colors.foreground, flex: 1 }}>{sub.title}</Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "700",
+                      color:
+                        sub.status === "approved" ? "#16a34a" : sub.status === "rejected" ? "#dc2626" : "#ca8a04",
+                    }}
+                  >
+                    {sub.status === "approved" ? "स्वीकृत ✅" : sub.status === "rejected" ? "अस्वीकृत ❌" : "समीक्षा में ⏳"}
+                  </Text>
+                </View>
+                {sub.status === "rejected" && sub.adminNotes ? (
+                  <Text style={{ marginTop: 6, color: "#dc2626", fontSize: 13 }}>कारण: {sub.adminNotes}</Text>
+                ) : null}
+              </View>
+            ))
+          ) : activeItems.length === 0 ? (
             <View style={styles.empty}>
               <Text style={{ fontSize: 48 }}>
                 {activeTab === "saved" ? "🔖" : activeTab === "liked" ? "❤️" : "🕐"}

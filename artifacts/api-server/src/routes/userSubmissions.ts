@@ -7,10 +7,12 @@ const router = Router();
 
 router.post("/submissions/audio", requireUserAuth, async (req, res) => {
   const user = (req as unknown as Record<string, unknown>).user as typeof usersTable.$inferSelect;
-  const { title, description, audioUrl, fileSize, durationSeconds } = req.body as {
+  const { title, description, audioUrl, thumbnailUrl, categoryId, fileSize, durationSeconds } = req.body as {
     title: string;
     description?: string;
     audioUrl: string;
+    thumbnailUrl?: string;
+    categoryId?: number;
     fileSize?: number;
     durationSeconds?: number;
   };
@@ -23,6 +25,8 @@ router.post("/submissions/audio", requireUserAuth, async (req, res) => {
     title,
     description: description ?? "",
     audioUrl,
+    thumbnailUrl: thumbnailUrl || null,
+    categoryId: categoryId ?? null,
     fileSize: fileSize ?? null,
     durationSeconds: durationSeconds ?? 0,
     status: "pending",
@@ -52,6 +56,11 @@ router.get("/submissions/all", async (_req, res) => {
 
 router.patch("/submissions/:id/approve", async (req, res) => {
   const id = Number(req.params.id);
+  const { categoryId, narrator } = req.body as { categoryId?: number; narrator?: string };
+  if (!categoryId) {
+    res.status(400).json({ error: "categoryId is required to approve a submission" });
+    return;
+  }
   const [submission] = await db.select().from(userSubmissionsTable).where(eq(userSubmissionsTable.id, id));
   if (!submission) { res.status(404).json({ error: "Not found" }); return; }
 
@@ -59,14 +68,19 @@ router.patch("/submissions/:id/approve", async (req, res) => {
     title: submission.title,
     description: submission.description,
     audioUrl: submission.audioUrl,
+    thumbnailUrl: submission.thumbnailUrl ?? null,
     durationSeconds: submission.durationSeconds,
-    published: false,
-    categoryId: null,
-    narrator: "",
+    published: true,
+    categoryId,
+    narrator: narrator ?? "",
     sourceType: "url",
   });
 
-  const [row] = await db.update(userSubmissionsTable).set({ status: "approved", updatedAt: new Date() }).where(eq(userSubmissionsTable.id, id)).returning();
+  const [row] = await db.update(userSubmissionsTable).set({
+    status: "approved",
+    categoryId,
+    updatedAt: new Date(),
+  }).where(eq(userSubmissionsTable.id, id)).returning();
   res.json(toDto(row, null));
 });
 
@@ -91,6 +105,8 @@ function toDto(row: typeof userSubmissionsTable.$inferSelect, user: typeof users
     title: row.title,
     description: row.description,
     audioUrl: row.audioUrl,
+    thumbnailUrl: row.thumbnailUrl,
+    categoryId: row.categoryId,
     fileSize: row.fileSize,
     durationSeconds: row.durationSeconds,
     status: row.status,
