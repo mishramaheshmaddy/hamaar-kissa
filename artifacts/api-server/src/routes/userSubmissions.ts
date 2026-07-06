@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, desc } from "drizzle-orm";
-import { db, userSubmissionsTable, usersTable, audioStoriesTable } from "@workspace/db";
+import { db, userSubmissionsTable, usersTable, audioStoriesTable, categoriesTable } from "@workspace/db";
 import { requireUserAuth } from "./userAuth";
 
 const router = Router();
@@ -54,6 +54,14 @@ router.get("/submissions/all", async (_req, res) => {
   res.json(rows.map((r) => toDto(r, userMap.get(r.userId) || null)));
 });
 
+router.get("/submissions/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const [row] = await db.select().from(userSubmissionsTable).where(eq(userSubmissionsTable.id, id));
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, row.userId));
+  res.json(toDto(row, user || null));
+});
+
 router.patch("/submissions/:id/approve", async (req, res) => {
   const id = Number(req.params.id);
   const { categoryId, narrator } = req.body as { categoryId?: number; narrator?: string };
@@ -63,6 +71,9 @@ router.patch("/submissions/:id/approve", async (req, res) => {
   }
   const [submission] = await db.select().from(userSubmissionsTable).where(eq(userSubmissionsTable.id, id));
   if (!submission) { res.status(404).json({ error: "Not found" }); return; }
+
+  const [category] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, categoryId));
+  const categoryLabel = category?.label || "";
 
   await db.insert(audioStoriesTable).values({
     title: submission.title,
@@ -79,6 +90,9 @@ router.patch("/submissions/:id/approve", async (req, res) => {
   const [row] = await db.update(userSubmissionsTable).set({
     status: "approved",
     categoryId,
+    adminNotes: categoryLabel
+      ? `आपके अपलोड कइल कहानी स्वीकृत हो गइल बा आउर "${categoryLabel}" श्रेणी में उपलब्ध बा।`
+      : `आपके अपलोड कइल कहानी स्वीकृत हो गइल बा आउर एप में उपलब्ध बा।`,
     updatedAt: new Date(),
   }).where(eq(userSubmissionsTable.id, id)).returning();
   res.json(toDto(row, null));

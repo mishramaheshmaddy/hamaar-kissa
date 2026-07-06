@@ -251,8 +251,16 @@ export default function ProfileScreen() {
                     {sub.status === "approved" ? "स्वीकृत ✅" : sub.status === "rejected" ? "अस्वीकृत ❌" : "समीक्षा में ⏳"}
                   </Text>
                 </View>
-                {sub.status === "rejected" && sub.adminNotes ? (
-                  <Text style={{ marginTop: 6, color: "#dc2626", fontSize: 13 }}>कारण: {sub.adminNotes}</Text>
+                {sub.adminNotes ? (
+                  <Text
+                    style={{
+                      marginTop: 6,
+                      color: sub.status === "rejected" ? "#dc2626" : "#16a34a",
+                      fontSize: 13,
+                    }}
+                  >
+                    {sub.status === "rejected" ? `कारण: ${sub.adminNotes}` : sub.adminNotes}
+                  </Text>
                 ) : null}
               </View>
             ))
