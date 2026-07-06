@@ -1,13 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
-import { Video, ResizeMode } from "expo-av";
+import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import {
   Alert,
+  AppState,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -97,7 +98,9 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const [saved, setSaved] = useState(false);
-  const [localPlayerOpen, setLocalPlayerOpen] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showPauseIcon, setShowPauseIcon] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [comments, setComments] = useState<{id: number; user: string; text: string}[]>([
     { id: 1, user: "रामू भइया", text: "बहुत बढ़िया वीडियो बा! 👏" },
@@ -106,6 +109,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const [newComment, setNewComment] = useState("");
   const { user } = useAuth();
   const router = useRouter();
+  const videoRef = useRef<Video>(null);
 
   const requireLogin = (action: () => void) => {
     if (!user) {
@@ -131,7 +135,36 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     }]);
     setNewComment("");
   };
-  const videoRef = useRef(null);
+
+  // Pause (and fully unload) as soon as this card scrolls off-screen —
+  // without this, expo-av keeps playing in the background indefinitely,
+  // even after leaving the Video tab or backgrounding the whole app.
+  useEffect(() => {
+    if (!isActive && started) {
+      videoRef.current?.pauseAsync().catch(() => {});
+      setIsPlaying(false);
+    }
+  }, [isActive, started]);
+
+  // Also pause whenever the app itself goes to background/inactive, so
+  // audio never keeps playing after the user leaves the app entirely.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        videoRef.current?.pauseAsync().catch(() => {});
+        setIsPlaying(false);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Unload the video when this card is unmounted (e.g. list re-renders),
+  // as an extra safety net against orphaned background playback.
+  useEffect(() => {
+    return () => {
+      videoRef.current?.unloadAsync().catch(() => {});
+    };
+  }, []);
 
   const numericId = parseInt(video.id, 10) || 0;
   const bgColor = BG_COLORS[numericId % BG_COLORS.length];
@@ -145,7 +178,26 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
         { presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN }
       );
     } else if (video.videoUrl) {
-      setLocalPlayerOpen(true);
+      setStarted(true);
+      setIsPlaying(true);
+    }
+  };
+
+  const togglePlayPause = async () => {
+    if (isPlaying) {
+      await videoRef.current?.pauseAsync().catch(() => {});
+      setIsPlaying(false);
+      setShowPauseIcon(true);
+    } else {
+      await videoRef.current?.playAsync().catch(() => {});
+      setIsPlaying(true);
+      setShowPauseIcon(false);
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (status.isLoaded) {
+      setIsPlaying(status.isPlaying);
     }
   };
 
@@ -160,24 +212,29 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
 
   return (
     <View style={[styles.container, { height: CARD_HEIGHT }]}>
-      {localPlayerOpen ? (
-        <View style={styles.playerContainer}>
-          <Video
-            ref={videoRef}
-            source={{ uri: getLocalVideoUrl() ?? "" }}
-            shouldPlay
-            isLooping
-            resizeMode={ResizeMode.COVER}
-            style={styles.player}
-            useNativeControls
-          />
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={() => setLocalPlayerOpen(false)}
-          >
-            <Feather name="x" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
+      {started && video.videoUrl ? (
+        <TouchableWithoutFeedback onPress={togglePlayPause}>
+          <View style={styles.playerContainer}>
+            <Video
+              ref={videoRef}
+              source={{ uri: getLocalVideoUrl() ?? "" }}
+              shouldPlay={isPlaying && isActive}
+              isLooping
+              resizeMode={ResizeMode.COVER}
+              style={styles.player}
+              useNativeControls={false}
+              onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+            />
+            {/* Minimal center play/pause icon — Reels-style, no persistent bar */}
+            {(showPauseIcon || !isPlaying) && (
+              <View style={styles.centerIconOverlay} pointerEvents="none">
+                <View style={styles.playCircle}>
+                  <Feather name={isPlaying ? "pause" : "play"} size={30} color="#fff" />
+                </View>
+              </View>
+            )}
+          </View>
+        </TouchableWithoutFeedback>
       ) : (
         <View style={[styles.videoArea, { backgroundColor: bgColor }]}>
           <Text style={styles.bigIcon}>{icon}</Text>
@@ -209,58 +266,54 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
         </View>
       )}
 
-      {!localPlayerOpen && (
-        <>
-          <View style={styles.bottomInfo}>
-            <Text style={styles.title} numberOfLines={2}>{video.title}</Text>
-            {video.description ? (
-              <Text style={styles.desc} numberOfLines={2}>{video.description}</Text>
-            ) : null}
-          </View>
+      <View style={styles.bottomInfo} pointerEvents="none">
+        <Text style={styles.title} numberOfLines={2}>{video.title}</Text>
+        {video.description ? (
+          <Text style={styles.desc} numberOfLines={2}>{video.description}</Text>
+        ) : null}
+      </View>
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={async () => {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setLiked((l) => !l);
-                setLikeCount((c) => (liked ? c - 1 : c + 1));
-              }}
-            >
-              <Feather name="heart" size={26} color={liked ? "#FF4444" : "#fff"} />
-              <Text style={styles.actionLabel}>
-                {likeCount > 999
-                  ? `${(likeCount / 1000).toFixed(1)}K`
-                  : likeCount || "पसंद"}
-              </Text>
-            </TouchableOpacity>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setLiked((l) => !l);
+            setLikeCount((c) => (liked ? c - 1 : c + 1));
+          }}
+        >
+          <Feather name="heart" size={26} color={liked ? "#FF4444" : "#fff"} />
+          <Text style={styles.actionLabel}>
+            {likeCount > 999
+              ? `${(likeCount / 1000).toFixed(1)}K`
+              : likeCount || "पसंद"}
+          </Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => setCommentOpen(true)}
-            >
-              <Feather name="message-circle" size={26} color="#fff" />
-              <Text style={styles.actionLabel}>बतावऽ ({comments.length})</Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => setCommentOpen(true)}
+        >
+          <Feather name="message-circle" size={26} color="#fff" />
+          <Text style={styles.actionLabel}>बतावऽ ({comments.length})</Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn}>
-              <Feather name="share-2" size={26} color="#fff" />
-              <Text style={styles.actionLabel}>शेयर</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn}>
+          <Feather name="share-2" size={26} color="#fff" />
+          <Text style={styles.actionLabel}>शेयर</Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={async () => {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setSaved((s) => !s);
-              }}
-            >
-              <Feather name="bookmark" size={26} color={saved ? "#F5A623" : "#fff"} />
-              <Text style={styles.actionLabel}>सेव</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setSaved((s) => !s);
+          }}
+        >
+          <Feather name="bookmark" size={26} color={saved ? "#F5A623" : "#fff"} />
+          <Text style={styles.actionLabel}>सेव</Text>
+        </TouchableOpacity>
+      </View>
       {/* Comment Modal */}
       <Modal
         visible={commentOpen}
@@ -354,6 +407,11 @@ const styles = StyleSheet.create({
   },
   playerContainer: { flex: 1, backgroundColor: "#000" },
   player: { flex: 1 },
+  centerIconOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   closeBtn: {
     position: "absolute",
     top: 50,
