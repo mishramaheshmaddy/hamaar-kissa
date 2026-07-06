@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,18 +31,31 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState("");
   const [confirmation, setConfirmation] = useState<any>(null);
+  const [resendTimer, setResendTimer] = useState(0);
   const otpInputRef = useRef<TextInput>(null);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
+  // Countdown for the "Resend OTP" button — ticks every second while on the
+  // OTP screen and resendTimer > 0.
+  useEffect(() => {
+    if (mode !== "otp" || resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((t) => Math.max(0, t - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [mode, resendTimer > 0]);
+
   const sendOtp = async () => {
     if (!phone.match(/^\d{10}$/)) return;
     setLoading(true);
+    setOtp("");
     try {
       const result = await sendOTP(`+91${phone}`);
       setConfirmation(result);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setMode("otp");
+      setResendTimer(30);
       setTimeout(() => otpInputRef.current?.focus(), 300);
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -205,6 +218,20 @@ export default function LoginScreen() {
               >
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionText}>Verify करीं</Text>}
               </TouchableOpacity>
+
+              <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 16, gap: 6 }}>
+                <Text style={{ color: colors.mutedForeground }}>OTP ना मिलल?</Text>
+                {resendTimer > 0 ? (
+                  <Text style={{ color: colors.mutedForeground, fontWeight: "600" }}>
+                    {resendTimer}s में फिर से भेजीं
+                  </Text>
+                ) : (
+                  <TouchableOpacity onPress={sendOtp} disabled={loading}>
+                    <Text style={{ color: colors.primary, fontWeight: "700" }}>फिर से भेजीं</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <TouchableOpacity onPress={() => setMode("phone")} style={{ marginTop: 12, alignSelf: "center" }}>
                 <Text style={{ color: colors.primary, fontWeight: "600" }}>नंबर बदल दीं</Text>
               </TouchableOpacity>
