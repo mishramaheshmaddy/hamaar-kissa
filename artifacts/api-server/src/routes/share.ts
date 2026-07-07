@@ -4,7 +4,7 @@ import { db, audioStoriesTable, videosTable } from "@workspace/db";
 
 const router = Router();
 
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.hamaarkissa.app";
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.haamarkissa.app&pcampaignid=web_share";
 
 router.get("/share/:type/:id", async (req, res) => {
   const { type, id } = req.params as { type: string; id: string };

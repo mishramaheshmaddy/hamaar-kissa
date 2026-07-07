@@ -9,6 +9,7 @@ import {
   View,
   Share,
   Alert,
+  Platform,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -190,9 +191,11 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
 
   const handleShare = async () => {
     try {
+      const webUrl = `${BASE}/share/audio/${story.id}`;
       await Share.share({
-        message: `"${story.title}" सुनीं Hamaar Kissa पर 🎙️\nhttps://hamaar-kissa-api.onrender.com`,
+        message: `"${story.title}" सुनीं Hamaar Kissa पर 🎙️\n${webUrl}`,
         title: story.title,
+        url: Platform.OS === "ios" ? webUrl : undefined,
       });
     } catch {}
   };

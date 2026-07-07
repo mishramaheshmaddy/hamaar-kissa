@@ -111,6 +111,20 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const router = useRouter();
   const videoRef = useRef<Video>(null);
 
+  const handleShare = async () => {
+    try {
+      const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
+      const BASE = DOMAIN ? `https://${DOMAIN}` : "";
+      const webUrl = `${BASE}/share/video/${video.id}`;
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({
+        message: `"${video.title}" देखीं Hamaar Kissa पर 🎬\n${webUrl}`,
+        title: video.title,
+        url: Platform.OS === "ios" ? webUrl : undefined,
+      });
+    } catch {}
+  };
+
   const requireLogin = (action: () => void) => {
     if (!user) {
       Alert.alert(
@@ -298,7 +312,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
           <Text style={styles.actionLabel}>बतावऽ ({comments.length})</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtn}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
           <Feather name="share-2" size={26} color="#fff" />
           <Text style={styles.actionLabel}>शेयर</Text>
         </TouchableOpacity>
