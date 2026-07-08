@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -85,6 +86,10 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
     playPrevious,
     queue,
     currentStory,
+    toggleLike,
+    toggleSave,
+    likedStories,
+    savedStories,
   } = useAudio();
 
   const gradient = CATEGORY_GRADIENTS[story.category] ?? ["#E8530A", "#BF360C"];
@@ -108,14 +113,17 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
     action();
   };
 
+  const isLiked = likedStories.includes(story.id);
+  const isSaved = savedStories.includes(story.id);
+
   const handleLike = () => requireLogin(() => {
-    // TODO: call like API
-    Alert.alert("❤️", "पसंद कइलऽ!");
+    toggleLike(story.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   });
 
   const handleSave = () => requireLogin(() => {
-    // TODO: call save/bookmark API
-    Alert.alert("🔖", "सेव हो गइल!");
+    toggleSave(story.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   });
 
   const { isDownloaded, addDownload, removeDownload } = useDownloads();
@@ -267,7 +275,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
         </View>
         <View style={styles.compactActions}>
           <TouchableOpacity onPress={handleLike} style={styles.actionBtn}>
-            <Feather name="heart" size={15} color={colors.mutedForeground} />
+            <Feather name="heart" size={15} color={isLiked ? "#FF4444" : colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
             <Feather name="share-2" size={15} color={colors.mutedForeground} />
@@ -327,10 +335,10 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
         {/* Action buttons row */}
         <View style={styles.actionsRow}>
           <TouchableOpacity onPress={handleLike} style={styles.actionBtn}>
-            <Feather name="heart" size={14} color={colors.mutedForeground} />
+            <Feather name="heart" size={14} color={isLiked ? "#FF4444" : colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleSave} style={styles.actionBtn}>
-            <Feather name="bookmark" size={14} color={colors.mutedForeground} />
+            <Feather name="bookmark" size={14} color={isSaved ? "#F5A623" : colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
             <Feather name="share-2" size={14} color={colors.mutedForeground} />
