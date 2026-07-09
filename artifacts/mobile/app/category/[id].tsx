@@ -15,8 +15,7 @@ import { useAudio, AudioStory } from "@/context/AudioContext";
 import { useColors } from "@/hooks/useColors";
 import AudioCard from "@/components/AudioCard";
 import MiniPlayer from "@/components/MiniPlayer";
-import { apiFetch, ApiAudioStory, ApiVideo, ApiCategory, BASE } from "@/lib/api";
-import { VideoItem } from "@/data/mockData";
+import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 
 function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory {
@@ -38,24 +37,6 @@ function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory 
   };
 }
 
-function mapVideo(v: ApiVideo, catMap: Record<number, string>): VideoItem {
-  return {
-    id: String(v.id),
-    title: v.title,
-    category: v.categoryId ? (catMap[v.categoryId] ?? "other") : "other",
-    categoryId: v.categoryId ?? undefined,
-    views: "0",
-    likes: 0,
-    creator: "",
-    thumbnail: v.thumbnailUrl ?? "",
-    duration: 0,
-    description: v.description,
-    youtubeId: v.youtubeId ?? undefined,
-    videoUrl: v.videoUrl ?? undefined,
-    sourceType: v.sourceType,
-  };
-}
-
 export default function CategoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -65,7 +46,6 @@ export default function CategoryDetailScreen() {
 
   const [category, setCategory] = useState<ApiCategory | null>(null);
   const [stories, setStories] = useState<AudioStory[]>([]);
-  const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -75,9 +55,8 @@ export default function CategoryDetailScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const [rawStories, rawVideos, allCats] = await Promise.all([
+        const [rawStories, allCats] = await Promise.all([
           apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-          apiFetch<ApiVideo[]>("/api/videos?published=true"),
           apiFetch<ApiCategory[]>("/api/categories"),
         ]);
         if (cancelled) return;
@@ -89,15 +68,13 @@ export default function CategoryDetailScreen() {
         const cat = allCats.find((c) => c.id === numId) ?? null;
         setCategory(cat);
 
+        // Audio-only: this screen is reached from "सब किसम" (all categories),
+        // and videos are intentionally excluded here — video content is only
+        // ever browsed via the Video tab's own category pills.
         const filteredStories = rawStories
           .filter((s) => s.categoryId === numId)
           .map((s) => mapStory(s, catMap));
         setStories(filteredStories);
-
-        const filteredVideos = rawVideos
-          .filter((v) => v.categoryId === numId)
-          .map((v) => mapVideo(v, catMap));
-        setVideos(filteredVideos);
       } catch (_e) {
       } finally {
         if (!cancelled) setLoading(false);
@@ -111,7 +88,7 @@ export default function CategoryDetailScreen() {
   const gradient: [string, string] =
     category ? (CATEGORY_GRADIENTS[category.name] ?? ["#E8530A", "#BF360C"]) : ["#E8530A", "#BF360C"];
 
-  const totalCount = stories.length + videos.length;
+  const totalCount = stories.length;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -123,7 +100,7 @@ export default function CategoryDetailScreen() {
           <Text style={styles.headerIcon}>{category?.icon ?? "🎙️"}</Text>
           <Text style={styles.headerTitle}>{category?.label ?? "..."}</Text>
           <Text style={styles.headerSubtitle}>
-            {loading ? "..." : `${totalCount} ${totalCount === 1 ? "आइटम" : "आइटम"}`}
+            {loading ? "..." : `${totalCount} ${totalCount === 1 ? "कहानी" : "कहानी"}`}
           </Text>
         </View>
       </View>
@@ -139,7 +116,7 @@ export default function CategoryDetailScreen() {
             कवनो सामग्री नइखे
           </Text>
           <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            CMS से इस किसिम में कहानी या वीडियो जोड़ीं
+            CMS से इस किसिम में कहानी जोड़ीं
           </Text>
           <TouchableOpacity
             style={[styles.backBtnPill, { backgroundColor: colors.primary }]}
@@ -156,36 +133,6 @@ export default function CategoryDetailScreen() {
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            videos.length > 0 ? (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-                  📹 वीडियो
-                </Text>
-                <FlatList
-                  data={videos}
-                  keyExtractor={(item) => `video-${item.id}`}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => router.push("/(tabs)/video")}
-                      style={[styles.videoCard, { backgroundColor: gradient[1] }]}
-                    >
-                      <Text style={styles.videoCardIcon}>🎬</Text>
-                      <Text style={styles.videoCardTitle} numberOfLines={2}>{item.title}</Text>
-                      {item.youtubeId && (
-                        <View style={styles.youtubeBadge}>
-                          <Feather name="youtube" size={12} color="#fff" />
-                          <Text style={styles.youtubeBadgeText}>YouTube</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                />
-              </View>
-            ) : null
-          }
           renderItem={({ item }) => (
             <View style={styles.cardWrapper}>
               <AudioCard

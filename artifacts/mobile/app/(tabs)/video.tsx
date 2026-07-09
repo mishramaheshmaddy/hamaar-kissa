@@ -79,6 +79,31 @@ export default function VideoScreen() {
     ? videos
     : videos.filter((v) => v.categoryId === activeCategory);
 
+  // The actual list rendered in the FlatList. Starts as a straight copy of
+  // filteredVideos; once the user nears the end, we append another random
+  // batch drawn from the same filtered set (with repeats) so the feed
+  // never visibly "runs out" — same idea as Reels/TikTok once you've seen
+  // everything once.
+  const [feedItems, setFeedItems] = useState<VideoItem[]>([]);
+  const MAX_FEED_LENGTH = 300; // sane cap so memory doesn't grow forever in one long session
+
+  useEffect(() => {
+    setFeedItems(filteredVideos);
+    setActiveIndex(0);
+  }, [activeCategory, videos.length]);
+
+  const appendRandomBatch = useCallback(() => {
+    if (filteredVideos.length === 0) return;
+    setFeedItems((prev) => {
+      if (prev.length >= MAX_FEED_LENGTH) return prev;
+      const batch: VideoItem[] = [];
+      for (let i = 0; i < 10; i++) {
+        batch.push(filteredVideos[Math.floor(Math.random() * filteredVideos.length)]);
+      }
+      return [...prev, ...batch];
+    });
+  }, [filteredVideos]);
+
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -136,8 +161,8 @@ export default function VideoScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredVideos}
-          keyExtractor={(item) => item.id}
+          data={feedItems}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           pagingEnabled
           showsVerticalScrollIndicator={false}
           snapToInterval={CARD_HEIGHT}
@@ -145,6 +170,8 @@ export default function VideoScreen() {
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
           getItemLayout={(_, index) => ({ length: CARD_HEIGHT, offset: CARD_HEIGHT * index, index })}
+          onEndReached={appendRandomBatch}
+          onEndReachedThreshold={2}
           renderItem={({ item, index }) => (
             <VideoCard video={item} isActive={index === activeIndex} />
           )}
