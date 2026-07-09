@@ -1,5 +1,8 @@
 import { Router } from "express";
 import multer from "multer";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { createClient } from "@supabase/supabase-js";
 import { logger } from "../lib/logger";
 import { FetchYoutubeInfoBody } from "@workspace/api-zod";
@@ -17,7 +20,20 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-const storage = multer.memoryStorage();
+// Writing incoming uploads straight to disk (instead of buffering the whole
+// file in memory) keeps server RAM usage roughly constant no matter the file
+// size. Buffering large video files in memory was crashing the Render
+// process (OOM kill) once files got into the tens-of-MB range on
+// memory-constrained instances.
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+  filename: (_req, file, cb) => {
+    const ext = file.originalname.includes(".")
+      ? file.originalname.substring(file.originalname.lastIndexOf("."))
+      : "";
+    cb(null, `upload-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  },
+});
 
 const upload = multer({
   storage,
@@ -38,6 +54,7 @@ const upload = multer({
 
 
 router.post("/media/upload", upload.single("file"), async (req, res) => {
+  const tempPath = req.file?.path;
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -59,12 +76,18 @@ router.post("/media/upload", upload.single("file"), async (req, res) => {
       bucket = "story-videos";
     }
 
+    // Stream the file straight from disk to Supabase instead of reading it
+    // into a Buffer first — avoids a second full-file memory spike on top
+    // of whatever multer already wrote to disk.
+    const fileStream = fs.createReadStream(req.file.path);
+
     const { error } = await supabase.storage
       .from(bucket)
-      .upload(filename, req.file.buffer, {
+      .upload(filename, fileStream, {
         contentType: req.file.mimetype,
         upsert: false,
-      });
+        duplex: "half",
+      } as any);
 
     if (error) {
       console.error(error);
@@ -84,6 +107,14 @@ router.post("/media/upload", upload.single("file"), async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Upload failed" });
+  } finally {
+    // Always clean up the temp file — Render's disk is ephemeral but
+    // shared across requests, so leftover files would accumulate over time.
+    if (tempPath) {
+      fs.unlink(tempPath, (unlinkErr) => {
+        if (unlinkErr) console.error("Failed to remove temp upload file:", unlinkErr);
+      });
+    }
   }
 });
 
