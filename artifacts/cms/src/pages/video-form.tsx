@@ -202,7 +202,7 @@ export default function VideoForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Source Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a type" />
@@ -274,9 +274,10 @@ export default function VideoForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(parseInt(val))} 
+                      <Select
+                        onValueChange={(val) => field.onChange(parseInt(val))}
                         value={field.value ? field.value.toString() : ""}
+                        defaultValue={field.value ? field.value.toString() : ""}
                       >
                         <FormControl>
                           <SelectTrigger>
