@@ -160,6 +160,16 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     }
   }, [isActive, started]);
 
+  // Autoplay: as soon as a local (uploaded) video becomes the active card,
+  // start it immediately — no tap needed, matching Reels/TikTok. YouTube
+  // videos still require a tap since they open in an external browser.
+  useEffect(() => {
+    if (isActive && video.videoUrl && !video.youtubeId) {
+      setStarted(true);
+      setIsPlaying(true);
+    }
+  }, [isActive, video.videoUrl, video.youtubeId]);
+
   // Also pause whenever the app itself goes to background/inactive, so
   // audio never keeps playing after the user leaves the app entirely.
   useEffect(() => {
@@ -238,6 +248,9 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
               style={styles.player}
               useNativeControls={false}
               onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+              usePoster={!!video.thumbnail}
+              posterSource={video.thumbnail ? { uri: video.thumbnail } : undefined}
+              posterStyle={styles.player}
             />
             {/* Minimal center play/pause icon — Reels-style, no persistent bar */}
             {(showPauseIcon || !isPlaying) && (

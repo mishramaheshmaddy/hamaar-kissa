@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
+import { AppState } from "react-native";
 import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
 import React, {
   createContext,
@@ -49,6 +50,7 @@ interface AudioContextType {
   moveQueueItemToTop: (storyId: string) => void;
   moveQueueItemToBottom: (storyId: string) => void;
   togglePlay: () => void;
+  pauseAudio: () => void;
   seekForward: () => void;
   seekBackward: () => void;
   setSpeed: (s: number) => void;
@@ -529,6 +531,33 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Explicit pause (not a toggle) — used when the whole app backgrounds, or
+  // when the user switches to the Video tab, so audio and video never play
+  // on top of each other.
+  const pauseAudio = useCallback(async () => {
+    if (soundRef.current) {
+      try {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded && status.isPlaying) {
+          await soundRef.current.pauseAsync();
+        }
+      } catch {}
+    }
+    setIsPlaying(false);
+  }, []);
+
+  // Pause audio whenever the app itself goes to background/inactive
+  // (switching to another app, locking the phone, etc.) — matches the same
+  // behavior already in place for video.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        pauseAudio();
+      }
+    });
+    return () => sub.remove();
+  }, [pauseAudio]);
+
   const seekForward = useCallback(async () => {
     if (soundRef.current) {
       try {
@@ -632,6 +661,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         moveQueueItemToTop,
         moveQueueItemToBottom,
         togglePlay,
+        pauseAudio,
         seekForward,
         seekBackward,
         setSpeed,

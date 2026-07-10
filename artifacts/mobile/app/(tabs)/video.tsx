@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useFocusEffect } from "expo-router";
+import { useAudio } from "@/context/AudioContext";
 import {
   ActivityIndicator,
   Dimensions,
@@ -43,6 +45,17 @@ export default function VideoScreen() {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<number | "all">("all");
+  const { pauseAudio } = useAudio();
+
+  // Watching a video is a deliberate choice to switch away from listening —
+  // stop any playing audio the moment this tab is focused, so the two never
+  // play on top of each other. Audio is left untouched everywhere else
+  // (Home, Profile, Categories, etc.) via the persistent mini-player.
+  useFocusEffect(
+    useCallback(() => {
+      pauseAudio();
+    }, [pauseAudio])
+  );
 
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
