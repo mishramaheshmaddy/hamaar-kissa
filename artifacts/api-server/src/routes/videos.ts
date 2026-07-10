@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, videosTable, categoriesTable } from "@workspace/db";
+import { requireAdmin } from "./auth";
 import {
   CreateVideoBody,
   UpdateVideoBody,
@@ -30,7 +31,7 @@ router.get("/videos", async (req, res) => {
   res.json(filtered.map(({ video, categoryName }) => toDto(video, categoryName)));
 });
 
-router.post("/videos", async (req, res) => {
+router.post("/videos", requireAdmin, async (req, res) => {
   const body = CreateVideoBody.parse(req.body);
   const [row] = await db.insert(videosTable).values({
     title: body.title,
@@ -58,7 +59,7 @@ router.get("/videos/:id", async (req, res) => {
   res.json(toDto(rows[0].video, rows[0].categoryName));
 });
 
-router.patch("/videos/:id", async (req, res) => {
+router.patch("/videos/:id", requireAdmin, async (req, res) => {
   const { id } = UpdateVideoParams.parse({ id: Number(req.params.id) });
   const body = UpdateVideoBody.parse(req.body);
   const updateData: Record<string, unknown> = { ...body, updatedAt: new Date() };
@@ -67,7 +68,7 @@ router.patch("/videos/:id", async (req, res) => {
   res.json(toDto(row, null));
 });
 
-router.delete("/videos/:id", async (req, res) => {
+router.delete("/videos/:id", requireAdmin, async (req, res) => {
   const { id } = DeleteVideoParams.parse({ id: Number(req.params.id) });
   await db.delete(videosTable).where(eq(videosTable.id, id));
   res.status(204).send();

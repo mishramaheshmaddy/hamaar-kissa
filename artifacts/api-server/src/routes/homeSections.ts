@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq, desc, asc } from "drizzle-orm";
 import { db, homeSectionsTable, audioStoriesTable, videosTable, categoriesTable, homeSectionItemsTable } from "@workspace/db";
+import { requireAdmin } from "./auth";
 
 const router = Router();
 
@@ -280,7 +281,7 @@ router.get("/home-sections/all", async (_req, res) => {
   res.json(rows.map(toDto));
 });
 
-router.post("/home-sections", async (req, res) => {
+router.post("/home-sections", requireAdmin, async (req, res) => {
   const body = req.body as {
     title: string;
     subtitle?: string;
@@ -302,7 +303,7 @@ router.post("/home-sections", async (req, res) => {
   res.status(201).json(toDto(row));
 });
 
-router.patch("/home-sections/:id", async (req, res) => {
+router.patch("/home-sections/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const body = req.body as Record<string, unknown>;
   const [row] = await db.update(homeSectionsTable).set({ ...body, updatedAt: new Date() }).where(eq(homeSectionsTable.id, id)).returning();
@@ -310,7 +311,7 @@ router.patch("/home-sections/:id", async (req, res) => {
   res.json(toDto(row));
 });
 
-router.put("/home-sections/reorder", async (req, res) => {
+router.put("/home-sections/reorder", requireAdmin, async (req, res) => {
   const items = req.body as Array<{ id: number; sortOrder: number }>;
   await Promise.all(
     items.map((item) => db.update(homeSectionsTable).set({ sortOrder: item.sortOrder, updatedAt: new Date() }).where(eq(homeSectionsTable.id, item.id)))
@@ -318,7 +319,7 @@ router.put("/home-sections/reorder", async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete("/home-sections/:id", async (req, res) => {
+router.delete("/home-sections/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   await db.delete(homeSectionsTable).where(eq(homeSectionsTable.id, id));
   res.status(204).send();
@@ -355,7 +356,7 @@ router.get("/home-sections/:id/content", async (req, res) => {
   res.json(result.filter(Boolean));
 });
 
-router.put("/home-sections/:id/content", async (req, res) => {
+router.put("/home-sections/:id/content", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const body = req.body as { items: Array<{ id: number; contentType: string; sortOrder: number }> };
   

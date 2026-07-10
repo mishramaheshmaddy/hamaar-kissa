@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, userSubmissionsTable, usersTable, audioStoriesTable, categoriesTable } from "@workspace/db";
 import { requireUserAuth } from "./userAuth";
+import { requireAdmin } from "./auth";
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.get("/submissions/my", requireUserAuth, async (req, res) => {
   res.json(rows.map((r) => toDto(r, user)));
 });
 
-router.get("/submissions/all", async (_req, res) => {
+router.get("/submissions/all", requireAdmin, async (_req, res) => {
   const rows = await db.select().from(userSubmissionsTable).orderBy(desc(userSubmissionsTable.createdAt));
   const userIds = [...new Set(rows.map((r) => r.userId))];
   let users: typeof usersTable.$inferSelect[] = [];
@@ -54,7 +55,7 @@ router.get("/submissions/all", async (_req, res) => {
   res.json(rows.map((r) => toDto(r, userMap.get(r.userId) || null)));
 });
 
-router.get("/submissions/:id", async (req, res) => {
+router.get("/submissions/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const [row] = await db.select().from(userSubmissionsTable).where(eq(userSubmissionsTable.id, id));
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -62,7 +63,7 @@ router.get("/submissions/:id", async (req, res) => {
   res.json(toDto(row, user || null));
 });
 
-router.patch("/submissions/:id/approve", async (req, res) => {
+router.patch("/submissions/:id/approve", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const { categoryId, narrator, title, description, durationSeconds } = req.body as {
     categoryId?: number;
@@ -111,7 +112,7 @@ router.patch("/submissions/:id/approve", async (req, res) => {
   res.json(toDto(row, null));
 });
 
-router.patch("/submissions/:id/reject", async (req, res) => {
+router.patch("/submissions/:id/reject", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   const { adminNotes } = req.body as { adminNotes?: string };
   const [row] = await db.update(userSubmissionsTable).set({

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, audioStoriesTable, categoriesTable } from "@workspace/db";
+import { requireAdmin } from "./auth";
 import {
   CreateAudioStoryBody,
   UpdateAudioStoryBody,
@@ -36,7 +37,7 @@ router.get("/audio-stories", async (req, res) => {
   res.json(filtered.map(({ story, categoryName }) => toDto(story, categoryName)));
 });
 
-router.post("/audio-stories", async (req, res) => {
+router.post("/audio-stories", requireAdmin, async (req, res) => {
   const body = CreateAudioStoryBody.parse(req.body);
   const [row] = await db.insert(audioStoriesTable).values({
     title: body.title,
@@ -65,7 +66,7 @@ router.get("/audio-stories/:id", async (req, res) => {
   res.json(toDto(rows[0].story, rows[0].categoryName));
 });
 
-router.patch("/audio-stories/:id", async (req, res) => {
+router.patch("/audio-stories/:id", requireAdmin, async (req, res) => {
   const { id } = UpdateAudioStoryParams.parse({ id: Number(req.params.id) });
   const body = UpdateAudioStoryBody.parse(req.body);
   const updateData: Record<string, unknown> = { ...body, updatedAt: new Date() };
@@ -74,7 +75,7 @@ router.patch("/audio-stories/:id", async (req, res) => {
   res.json(toDto(row, null));
 });
 
-router.delete("/audio-stories/:id", async (req, res) => {
+router.delete("/audio-stories/:id", requireAdmin, async (req, res) => {
   const { id } = DeleteAudioStoryParams.parse({ id: Number(req.params.id) });
   await db.delete(audioStoriesTable).where(eq(audioStoriesTable.id, id));
   res.status(204).send();

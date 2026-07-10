@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, categoriesTable } from "@workspace/db";
+import { requireAdmin } from "./auth";
 import {
   CreateCategoryBody,
   UpdateCategoryBody,
@@ -21,7 +22,7 @@ router.get("/categories", async (req, res) => {
   res.json(rows.map(toDto));
 });
 
-router.post("/categories", async (req, res) => {
+router.post("/categories", requireAdmin, async (req, res) => {
   const body = CreateCategoryBody.parse(req.body);
   const [row] = await db.insert(categoriesTable).values({
     name: body.name,
@@ -41,7 +42,7 @@ router.get("/categories/:id", async (req, res) => {
   res.json(toDto(rows[0]));
 });
 
-router.patch("/categories/:id", async (req, res) => {
+router.patch("/categories/:id", requireAdmin, async (req, res) => {
   const { id } = UpdateCategoryParams.parse({ id: Number(req.params.id) });
   const body = UpdateCategoryBody.parse(req.body);
   const [row] = await db.update(categoriesTable).set({
@@ -52,7 +53,7 @@ router.patch("/categories/:id", async (req, res) => {
   res.json(toDto(row));
 });
 
-router.delete("/categories/:id", async (req, res) => {
+router.delete("/categories/:id", requireAdmin, async (req, res) => {
   const { id } = DeleteCategoryParams.parse({ id: Number(req.params.id) });
   await db.delete(categoriesTable).where(eq(categoriesTable.id, id));
   res.status(204).send();

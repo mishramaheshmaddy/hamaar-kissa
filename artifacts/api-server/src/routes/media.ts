@@ -5,6 +5,7 @@ import os from "os";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
 import { logger } from "../lib/logger";
+import { requireAdmin } from "./auth";
 import { FetchYoutubeInfoBody } from "@workspace/api-zod";
 const router = Router();
 
@@ -119,7 +120,7 @@ router.post("/media/upload", upload.single("file"), async (req, res) => {
 });
 
 
-router.post("/media/youtube-info", async (req, res) => {
+router.post("/media/youtube-info", requireAdmin, async (req, res) => {
   const body = FetchYoutubeInfoBody.parse(req.body);
   const url = body.url;
 
@@ -172,7 +173,7 @@ router.post("/media/youtube-info", async (req, res) => {
 
 
 
-router.post("/media/migrate-supabase-urls", async (_req, res) => {
+router.post("/media/migrate-supabase-urls", requireAdmin, async (_req, res) => {
   try {
     const { db, audioStoriesTable, videosTable } = await import("@workspace/db");
     const { eq } = await import("drizzle-orm");
