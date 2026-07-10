@@ -303,7 +303,7 @@ export default function AudioStoryForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Audio Source Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a type" />

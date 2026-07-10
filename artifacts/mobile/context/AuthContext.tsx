@@ -68,9 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data);
         await AsyncStorage.setItem("hk_user", JSON.stringify(data));
       } else {
+        console.error("fetchUser failed, status:", res.status);
         await logout();
       }
-    } catch {}
+    } catch (err) {
+      console.error("fetchUser error:", err);
+    }
   };
 
   const login = async (newToken: string, newUser: AuthUser) => {

@@ -27,13 +27,15 @@ export default function SearchScreen() {
     (async () => {
       try {
         const [a, v] = await Promise.all([
-          apiFetch<any[]>("/api/audio-stories"),
-          apiFetch<any[]>("/api/videos"),
+          apiFetch<any[]>("/api/audio-stories?published=true"),
+          apiFetch<any[]>("/api/videos?published=true"),
         ]);
 
         setAudio(a || []);
         setVideos(v || []);
-      } catch {}
+      } catch (err) {
+        console.error("search fetch error:", err);
+      }
     })();
   }, []);
 
