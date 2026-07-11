@@ -169,7 +169,7 @@ export default function VideoForm() {
 
   const isPending = createVideo.isPending || updateVideo.isPending;
 
-  if (isLoading) {
+  if (isLoading || (!isNew && !categoriesRaw)) {
     return (
       <div className="p-8 flex justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />

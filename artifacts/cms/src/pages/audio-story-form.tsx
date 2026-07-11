@@ -162,7 +162,7 @@ export default function AudioStoryForm() {
 
   const isPending = createStory.isPending || updateStory.isPending;
 
-  if (isLoading) {
+  if (isLoading || (!isNew && !categoriesRaw)) {
     return (
       <div className="p-8 flex justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
