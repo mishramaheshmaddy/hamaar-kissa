@@ -73,11 +73,7 @@ export default function VideoForm() {
   });
 
   useEffect(() => {
-    if (video && !isNew) {
-      console.log("[DEBUG] raw video from API:", video);
-      console.log("[DEBUG] video.categoryId:", video.categoryId, typeof video.categoryId);
-      console.log("[DEBUG] video.sourceType:", video.sourceType, typeof video.sourceType);
-      console.log("[DEBUG] categoriesRaw at reset time:", categoriesRaw);
+    if (video && !isNew && categoriesRaw && categoriesRaw.length > 0) {
       form.reset({
         title: video.title,
         categoryId: video.categoryId || undefined,
@@ -89,12 +85,19 @@ export default function VideoForm() {
         published: video.published,
         sortOrder: video.sortOrder,
       });
-      console.log("[DEBUG] form.getValues() right after reset:", form.getValues());
-      setTimeout(() => {
-        console.log("[DEBUG] form.getValues() 500ms after reset:", form.getValues());
-      }, 500);
+      // Belt-and-suspenders: Radix Select can fail to reflect a value that
+      // arrives right as it first mounts, even though the underlying form
+      // state is already correct. Re-applying the values shortly after
+      // guarantees the dropdowns display correctly. (Same pattern already
+      // proven out in audio-story-form.tsx.)
+      if (video.categoryId) {
+        setTimeout(() => { form.setValue("categoryId", video.categoryId!); }, 500);
+      }
+      if (video.sourceType) {
+        setTimeout(() => { form.setValue("sourceType", video.sourceType); }, 500);
+      }
     }
-  }, [video, isNew, form]);
+  }, [video, isNew, categoriesRaw, form]);
 
   const onSubmit = (data: FormValues) => {
     if (isNew) {
@@ -210,7 +213,7 @@ export default function VideoForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Source Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <Select key={`sourceType-${video?.id ?? "new"}`} onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a type" />
@@ -279,13 +282,11 @@ export default function VideoForm() {
                 <FormField
                   control={form.control}
                   name="categoryId"
-                  render={({ field }) => {
-                    console.log("[DEBUG][render] categoryId field.value:", field.value, typeof field.value);
-                    console.log("[DEBUG][render] categories available:", categories?.map((c) => ({ id: c.id, type: typeof c.id, label: c.label })));
-                    return (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
                       <Select
+                        key={`categoryId-${video?.id ?? "new"}`}
                         onValueChange={(val) => field.onChange(parseInt(val))}
                         value={field.value ? field.value.toString() : ""}
                         defaultValue={field.value ? field.value.toString() : ""}
@@ -305,8 +306,7 @@ export default function VideoForm() {
                       </Select>
                       <FormMessage />
                     </FormItem>
-                    );
-                  }}
+                  )}
                 />
               </div>
 
