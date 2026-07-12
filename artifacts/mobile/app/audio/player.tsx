@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Linking,
@@ -14,15 +15,35 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAudio } from "@/context/AudioContext";
+import { useAudio, AudioStory } from "@/context/AudioContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
+import { apiFetch, ApiAudioStory } from "@/lib/api";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
+
+function mapStory(s: ApiAudioStory): AudioStory {
+  return {
+    id: String(s.id),
+    title: s.title,
+    category: s.categoryName || "other",
+    categoryId: s.categoryId ?? undefined,
+    categoryName: s.categoryName ?? undefined,
+    duration: s.durationSeconds,
+    thumbnail: s.thumbnailUrl
+      ? (s.thumbnailUrl.startsWith("/") ? `${BASE}${s.thumbnailUrl}` : s.thumbnailUrl)
+      : "",
+    narrator: s.narrator,
+    description: s.description,
+    audioUrl: s.audioUrl
+      ? (s.audioUrl.startsWith("/") ? `${BASE}${s.audioUrl}` : s.audioUrl)
+      : "",
+  };
+}
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
@@ -76,6 +97,31 @@ export default function AudioPlayerScreen() {
   const [showSpeeds, setShowSpeeds] = useState(false);
   const { addDownload, removeDownload, isDownloaded } = useDownloads();
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [recommended, setRecommended] = useState<AudioStory[]>([]);
+
+  useEffect(() => {
+    if (!currentStory?.categoryId) {
+      setRecommended([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true");
+        if (cancelled) return;
+        const list = rows
+          .filter((s) => s.categoryId === currentStory.categoryId && String(s.id) !== currentStory.id)
+          .map(mapStory)
+          .slice(0, 10);
+        setRecommended(list);
+      } catch (err) {
+        console.error("player recommendations fetch error:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStory?.categoryId, currentStory?.id]);
 
   // Login check helper — mirrors AudioCard's requireLogin so Player and
   // Home/Category screens gate Like/Save/Download identically.
@@ -211,7 +257,15 @@ async function handleShare() {
 
   return (
     <View style={[styles.container, { backgroundColor: gradient[1] }]}>
-      <View style={[styles.bgOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]} />
+      {currentStory.thumbnail && (
+        <Image
+          source={{ uri: currentStory.thumbnail }}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="cover"
+          blurRadius={Platform.OS === "android" ? 60 : 40}
+        />
+      )}
+      <View style={[styles.bgOverlay, { backgroundColor: currentStory.thumbnail ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.5)" }]} />
 
       <ScrollView
         contentContainerStyle={[
@@ -229,11 +283,20 @@ async function handleShare() {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Big Icon */}
+        {/* Cover Art */}
         <View style={[styles.artworkContainer, { borderColor: "rgba(255,255,255,0.2)" }]}>
-          <View style={[styles.artwork, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
-            <Text style={styles.artworkIcon}>{icon}</Text>
-          </View>
+          {currentStory.thumbnail ? (
+            <Image
+              source={{ uri: currentStory.thumbnail }}
+              style={styles.artworkImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={[styles.artwork, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
+              <Text style={styles.artworkIcon}>{icon}</Text>
+            </View>
+          )}
           {isPlaying && (
             <View style={styles.soundWaves}>
               {[14, 22, 16, 24, 18].map((h, i) => (
@@ -407,12 +470,92 @@ async function handleShare() {
             </View>
           )}
         </View>
+
+        {/* More from same category */}
+        {recommended.length > 0 && (
+          <View style={styles.recoSection}>
+            <Text style={styles.recoHeading}>
+              {currentStory.categoryName ? `${currentStory.categoryName} से आउर सुनीं` : "आउर सुनीं"}
+            </Text>
+            {recommended.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.recoRow}
+                activeOpacity={0.8}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  playStory(item);
+                }}
+              >
+                {item.thumbnail ? (
+                  <Image source={{ uri: item.thumbnail }} style={styles.recoThumb} contentFit="cover" />
+                ) : (
+                  <View style={[styles.recoThumb, styles.recoThumbFallback]}>
+                    <Text style={{ fontSize: 22 }}>{CATEGORY_ICONS[item.category] ?? "🎙️"}</Text>
+                  </View>
+                )}
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.recoTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.recoMeta} numberOfLines={1}>
+                    {item.narrator ? `${item.narrator} • ` : ""}{formatTotal(item.duration)}
+                  </Text>
+                </View>
+                <Feather name="play-circle" size={26} color="rgba(255,255,255,0.85)" />
+              </TouchableOpacity>
+            ))}
+
+            {currentStory.categoryId && (
+              <TouchableOpacity
+                style={styles.recoMoreBtn}
+                onPress={() => router.push(`/category/${currentStory.categoryId}` as any)}
+              >
+                <Text style={styles.recoMoreText}>और देखीं</Text>
+                <Feather name="arrow-right" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  recoSection: { width: "100%", marginTop: 40 },
+  recoHeading: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "800",
+    marginBottom: 14,
+  },
+  recoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    padding: 8,
+  },
+  recoThumb: { width: 52, height: 52, borderRadius: 10 },
+  recoThumbFallback: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recoTitle: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  recoMeta: { color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 },
+  recoMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  recoMoreText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   container: { flex: 1 },
   bgOverlay: { ...StyleSheet.absoluteFillObject },
   content: { paddingHorizontal: 24, alignItems: "center" },
@@ -454,6 +597,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
+  },
+  artworkImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 28,
   },
   artworkIcon: { fontSize: 96 },
   soundWaves: {
