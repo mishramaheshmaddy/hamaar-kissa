@@ -201,7 +201,9 @@ export default function HomeScreen() {
             <Image source={logo} style={styles.logoImg} contentFit="contain" />
             <View>
               <Text style={[styles.greeting, { color: colors.mutedForeground }]}>राम-राम! 🙏</Text>
-              <Text style={[styles.appName, { color: colors.foreground }]}>Hamaar Kissa</Text>
+              <Text style={[styles.appName, { color: colors.foreground }]}>
+                {user?.name?.trim() ? `${user.name.trim().split(" ")[0]} जी` : "Hamaar Kissa"}
+              </Text>
             </View>
           </View>
           <View style={styles.headerRight}>
