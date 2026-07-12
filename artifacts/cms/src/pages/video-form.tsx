@@ -74,6 +74,10 @@ export default function VideoForm() {
 
   useEffect(() => {
     if (video && !isNew) {
+      console.log("[DEBUG] raw video from API:", video);
+      console.log("[DEBUG] video.categoryId:", video.categoryId, typeof video.categoryId);
+      console.log("[DEBUG] video.sourceType:", video.sourceType, typeof video.sourceType);
+      console.log("[DEBUG] categoriesRaw at reset time:", categoriesRaw);
       form.reset({
         title: video.title,
         categoryId: video.categoryId || undefined,
@@ -85,6 +89,10 @@ export default function VideoForm() {
         published: video.published,
         sortOrder: video.sortOrder,
       });
+      console.log("[DEBUG] form.getValues() right after reset:", form.getValues());
+      setTimeout(() => {
+        console.log("[DEBUG] form.getValues() 500ms after reset:", form.getValues());
+      }, 500);
     }
   }, [video, isNew, form]);
 
@@ -271,7 +279,10 @@ export default function VideoForm() {
                 <FormField
                   control={form.control}
                   name="categoryId"
-                  render={({ field }) => (
+                  render={({ field }) => {
+                    console.log("[DEBUG][render] categoryId field.value:", field.value, typeof field.value);
+                    console.log("[DEBUG][render] categories available:", categories?.map((c) => ({ id: c.id, type: typeof c.id, label: c.label })));
+                    return (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
                       <Select
@@ -294,7 +305,8 @@ export default function VideoForm() {
                       </Select>
                       <FormMessage />
                     </FormItem>
-                  )}
+                    );
+                  }}
                 />
               </div>
 
