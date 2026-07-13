@@ -76,12 +76,12 @@ export default function AboutScreen() {
         <View style={[styles.contactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.contactTitle, { color: colors.foreground }]}>📬 संपर्क</Text>
           <TouchableOpacity
-            onPress={() => Linking.openURL("mailto:thenewsheeoperations@gmail.com")}
+            onPress={() => Linking.openURL("mailto:hamaarkissa@gmail.com")}
             style={styles.emailRow}
           >
             <Feather name="mail" size={16} color={colors.primary} />
             <Text style={[styles.emailText, { color: colors.primary }]}>
-              thenewsheeoperations@gmail.com
+              hamaarkissa@gmail.com
             </Text>
           </TouchableOpacity>
         </View>

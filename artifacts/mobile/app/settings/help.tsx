@@ -94,7 +94,7 @@ export default function HelpScreen() {
 
         <TouchableOpacity
           style={[styles.contactCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => Linking.openURL("mailto:thenewsheeoperations@gmail.com")}
+          onPress={() => Linking.openURL("mailto:hamaarkissa@gmail.com")}
         >
           <View style={[styles.contactIcon, { backgroundColor: "#4285F420" }]}>
             <Text style={{ fontSize: 24 }}>✉️</Text>
@@ -102,7 +102,7 @@ export default function HelpScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[styles.contactLabel, { color: colors.foreground }]}>ईमेल सपोर्ट</Text>
             <Text style={[styles.contactValue, { color: colors.primary }]}>
-              thenewsheeoperations@gmail.com
+              hamaarkissa@gmail.com
             </Text>
             <Text style={[styles.contactDesc, { color: colors.mutedForeground }]}>
               24 घंटे के अंदर जवाब मिलेगा
