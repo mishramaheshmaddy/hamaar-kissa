@@ -141,20 +141,29 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalList}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => router.push("/(tabs)/video")}
-                style={[styles.videoThumb, { backgroundColor: "#1C1208" }]}
-              >
-                <Text style={styles.videoThumbIcon}>
-                  {VIDEO_CATEGORY_ICONS[item.categoryName ?? "other"] ?? "🎬"}
-                </Text>
-                <View style={styles.videoOverlay} />
-                <View style={styles.videoInfo}>
-                  <Text style={styles.videoTitle} numberOfLines={2}>{item.title}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const thumb = item.thumbnailUrl
+                ? (item.thumbnailUrl.startsWith("/") ? `${BASE}${item.thumbnailUrl}` : item.thumbnailUrl)
+                : "";
+              return (
+                <TouchableOpacity
+                  onPress={() => router.push("/(tabs)/video")}
+                  style={[styles.videoThumb, { backgroundColor: "#1C1208" }]}
+                >
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                  ) : (
+                    <Text style={styles.videoThumbIcon}>
+                      {VIDEO_CATEGORY_ICONS[item.categoryName ?? "other"] ?? "🎬"}
+                    </Text>
+                  )}
+                  <View style={styles.videoOverlay} />
+                  <View style={styles.videoInfo}>
+                    <Text style={styles.videoTitle} numberOfLines={2}>{item.title}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
           />
         </View>
       );

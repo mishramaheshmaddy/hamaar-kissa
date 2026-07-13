@@ -16,6 +16,7 @@ import VideoForm from "@/pages/video-form";
 import HomeScreenManager from "@/pages/home-screen";
 import UserSubmissions from "@/pages/user-submissions";
 import UserSubmissionDetail from "@/pages/user-submission-detail";
+import BulkUpload from "@/pages/bulk-upload";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/videos" component={Videos} />
         <Route path="/videos/new" component={VideoForm} />
         <Route path="/videos/:id" component={VideoForm} />
+        <Route path="/bulk-upload" component={BulkUpload} />
         <Route path="/home-screen" component={HomeScreenManager} />
         <Route path="/user-submissions/:id" component={UserSubmissionDetail} />
         <Route path="/user-submissions" component={UserSubmissions} />
