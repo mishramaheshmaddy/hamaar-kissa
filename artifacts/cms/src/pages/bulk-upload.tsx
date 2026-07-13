@@ -163,6 +163,7 @@ export default function BulkUpload() {
 
   // ---- Sheet upload state ----
   const [sheetRows, setSheetRows] = useState<SheetRow[]>([]);
+  const [sheetFileName, setSheetFileName] = useState<string | null>(null);
   const [importingSheet, setImportingSheet] = useState(false);
   const [sheetProgress, setSheetProgress] = useState(0);
   const sheetInputRef = useRef<HTMLInputElement>(null);
@@ -170,6 +171,7 @@ export default function BulkUpload() {
   const handleSheetSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSheetFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -525,13 +527,21 @@ export default function BulkUpload() {
 
               <div>
                 <Label>Select {contentType === "audio" ? "audio (.mp3, .wav, .m4a)" : "video (.mp4, .mov)"} files</Label>
+                <div className="mt-1 flex items-center gap-3">
+                  <Button type="button" variant="outline" className="gap-2" onClick={() => fileInputRef.current?.click()}>
+                    <UploadCloud className="w-4 h-4" /> Choose Files
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {fileRows.length > 0 ? `${fileRows.length} file${fileRows.length === 1 ? "" : "s"} selected` : "No files chosen"}
+                  </span>
+                </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
                   accept={contentType === "audio" ? "audio/*" : "video/*"}
                   onChange={handleFilesSelected}
-                  className="mt-1 block w-full text-sm"
+                  className="hidden"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Titles are auto-generated from filenames (underscores/dashes become spaces) — you can rename each item later.
@@ -584,12 +594,18 @@ export default function BulkUpload() {
 
               <div>
                 <Label>Select sheet</Label>
+                <div className="mt-1 flex items-center gap-3">
+                  <Button type="button" variant="outline" className="gap-2" onClick={() => sheetInputRef.current?.click()}>
+                    <FileSpreadsheet className="w-4 h-4" /> Choose Sheet
+                  </Button>
+                  <span className="text-sm text-muted-foreground">{sheetFileName ?? "No file chosen"}</span>
+                </div>
                 <input
                   ref={sheetInputRef}
                   type="file"
                   accept=".csv,.xlsx,.xls"
                   onChange={handleSheetSelected}
-                  className="mt-1 block w-full text-sm"
+                  className="hidden"
                 />
               </div>
 
@@ -666,26 +682,40 @@ export default function BulkUpload() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Step 1 — Select the sheet</Label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <Button type="button" variant="outline" className="gap-2" onClick={() => matchSheetInputRef.current?.click()}>
+                      <FileSpreadsheet className="w-4 h-4" /> Choose Sheet
+                    </Button>
+                  </div>
                   <input
                     ref={matchSheetInputRef}
                     type="file"
                     accept=".csv,.xlsx,.xls"
                     onChange={handleMatchSheetSelected}
-                    className="mt-1 block w-full text-sm"
+                    className="hidden"
                   />
-                  {matchRows.length > 0 && <p className="text-xs text-muted-foreground mt-1">{matchRows.length} rows read.</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {matchRows.length > 0 ? `${matchRows.length} rows read.` : "No file chosen"}
+                  </p>
                 </div>
                 <div>
                   <Label>Step 2 — Select the matching files</Label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <Button type="button" variant="outline" className="gap-2" onClick={() => matchFilesInputRef.current?.click()}>
+                      <UploadCloud className="w-4 h-4" /> Choose Files
+                    </Button>
+                  </div>
                   <input
                     ref={matchFilesInputRef}
                     type="file"
                     multiple
                     accept={contentType === "audio" ? "audio/*" : "video/*"}
                     onChange={handleMatchFilesSelected}
-                    className="mt-1 block w-full text-sm"
+                    className="hidden"
                   />
-                  {matchFiles.length > 0 && <p className="text-xs text-muted-foreground mt-1">{matchFiles.length} files selected.</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {matchFiles.length > 0 ? `${matchFiles.length} files selected.` : "No files chosen"}
+                  </p>
                 </div>
               </div>
 
