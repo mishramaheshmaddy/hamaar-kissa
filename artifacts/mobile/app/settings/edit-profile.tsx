@@ -15,14 +15,48 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
+import { BASE } from "@/lib/api";
+
+function formatDateForInput(value?: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function toApiDate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/^(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})$/);
+  if (!match) return undefined;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const colors = useColors();
   const { user, token, fetchUser } = useAuth();
-
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
-const BASE = DOMAIN ? `https://${DOMAIN}` : "";
 
 const [saving,setSaving]=useState(false);
 const [usernameAvailable,setUsernameAvailable]=useState<boolean|null>(null);
@@ -42,13 +76,10 @@ const [avatar,setAvatar]=useState(user?.avatarUrl ?? "");
     setFullName(user.name ?? "");
     setMobile(user.phone ?? "");
     setEmail(user.email ?? "");
-setAvatar(user.avatarUrl ?? "");
-
-    const generated=(user.name ?? "user")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g,"");
-
-    setUsername(generated);
+    setAvatar(user.avatarUrl ?? "");
+    setDob(formatDateForInput(user.dateOfBirth));
+    setAge(user.age != null ? String(user.age) : "");
+    setUsername(user.username ?? "");
 
   },[user]);
 
@@ -120,6 +151,18 @@ setAvatar(user.avatarUrl ?? "");
       return;
     }
 
+    const apiDateOfBirth = toApiDate(dob);
+
+    if (apiDateOfBirth === undefined) {
+      Alert.alert("Error", "जन्म तिथि DD/MM/YYYY format में लिखीं।");
+      return;
+    }
+
+    if (usernameError || usernameAvailable === false) {
+      Alert.alert("Error", usernameError || "Username पहले से इस्तेमाल हो रहल बा।");
+      return;
+    }
+
     try{
 
       setSaving(true);
@@ -133,7 +176,7 @@ setAvatar(user.avatarUrl ?? "");
         body:JSON.stringify({
           name:fullName.trim(),
           username:username.trim()||null,
-          dateOfBirth:dob||null,
+          dateOfBirth:apiDateOfBirth,
           age:age?Number(age):null,
           phone:mobile||null,
           email:email||null,
@@ -141,7 +184,7 @@ setAvatar(user.avatarUrl ?? "");
         }),
       });
 
-      const data=await res.json();
+      const data=await res.json().catch(() => ({}));
 
       if(!res.ok){
         Alert.alert("Error",data.error||"Save failed");
@@ -193,6 +236,12 @@ useEffect(()=>{
 
   }
 
+  if (user?.username && username === user.username) {
+    setUsernameAvailable(true);
+    setUsernameError("");
+    return;
+  }
+
   setUsernameError("");
 
   const timer=setTimeout(async()=>{
@@ -213,7 +262,7 @@ useEffect(()=>{
 
   return ()=>clearTimeout(timer);
 
-},[username]);
+},[username,user?.username]);
 
 
 

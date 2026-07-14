@@ -26,6 +26,27 @@ export function verifyUserToken(token: string): { userId: number } | null {
   }
 }
 
+function parseProfileDate(value: string): Date | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
 export async function requireUserAuth(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith("Bearer ")) {
@@ -278,6 +299,18 @@ router.put("/auth/profile", async (req, res) => {
     .from(usersTable)
     .where(eq(usersTable.id,decoded.userId));
 
+  if (!current) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const parsedDateOfBirth = dateOfBirth ? parseProfileDate(dateOfBirth) : undefined;
+
+  if (dateOfBirth && !parsedDateOfBirth) {
+    res.status(400).json({ error: "Invalid date of birth" });
+    return;
+  }
+
   const [user]=await db.update(usersTable).set({
 
     name:name ?? undefined,
@@ -286,9 +319,7 @@ router.put("/auth/profile", async (req, res) => {
 
     username:username ?? undefined,
 
-    dateOfBirth:dateOfBirth
-      ? new Date(dateOfBirth)
-      : undefined,
+    dateOfBirth:parsedDateOfBirth,
 
     age:age ?? undefined,
 
