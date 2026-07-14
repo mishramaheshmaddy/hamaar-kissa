@@ -9,6 +9,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   AppState,
+  DeviceEventEmitter,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -102,10 +103,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
-  const [comments, setComments] = useState<{id: number; user: string; text: string}[]>([
-    { id: 1, user: "रामू भइया", text: "बहुत बढ़िया वीडियो बा! 👏" },
-    { id: 2, user: "सीता दीदी", text: "मन खुश हो गइल 😊" },
-  ]);
+  const [comments, setComments] = useState<{id: number; user: string; text: string}[]>([]);
   const [newComment, setNewComment] = useState("");
   const { user } = useAuth();
   const router = useRouter();
@@ -155,8 +153,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   // even after leaving the Video tab or backgrounding the whole app.
   useEffect(() => {
     if (!isActive && started) {
-      videoRef.current?.pauseAsync().catch(() => {});
-      setIsPlaying(false);
+      stopVideo();
     }
   }, [isActive, started]);
 
@@ -175,10 +172,20 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
-        videoRef.current?.pauseAsync().catch(() => {});
-        setIsPlaying(false);
+        stopVideo();
       }
     });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      "STOP_ALL_VIDEOS",
+      () => {
+        stopVideo();
+      }
+    );
+
     return () => sub.remove();
   }, []);
 
@@ -186,7 +193,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   // as an extra safety net against orphaned background playback.
   useEffect(() => {
     return () => {
-      videoRef.current?.unloadAsync().catch(() => {});
+      stopVideo();
     };
   }, []);
 
@@ -194,7 +201,21 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const bgColor = BG_COLORS[numericId % BG_COLORS.length];
   const icon = (video.categoryId && CATEGORY_ID_ICONS[video.categoryId]) ?? "🎬";
 
-  const handlePlay = async () => {
+  
+  const stopVideo = async () => {
+    try {
+      await videoRef.current?.stopAsync();
+    } catch {}
+
+    try {
+      await videoRef.current?.unloadAsync();
+    } catch {}
+
+    setIsPlaying(false);
+    setStarted(false);
+  };
+
+const handlePlay = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (video.youtubeId) {
       await WebBrowser.openBrowserAsync(
@@ -202,7 +223,9 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
         { presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN }
       );
     } else if (video.videoUrl) {
-      setStarted(true);
+      if (!started) {
+        setStarted(true);
+      }
       setIsPlaying(true);
     }
   };
@@ -248,9 +271,6 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
               style={styles.player}
               useNativeControls={false}
               onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-              usePoster={!!video.thumbnail}
-              posterSource={video.thumbnail ? { uri: video.thumbnail } : undefined}
-              posterStyle={styles.player}
             />
             {/* Minimal center play/pause icon — Reels-style, no persistent bar */}
             {(showPauseIcon || !isPlaying) && (

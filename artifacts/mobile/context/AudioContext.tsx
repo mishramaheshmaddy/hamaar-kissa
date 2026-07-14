@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
-import { AppState } from "react-native";
+import { AppState, DeviceEventEmitter } from "react-native";
 import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
 import React, {
   createContext,
@@ -231,6 +231,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const playStory = useCallback(
     async (story: AudioStory) => {
+      DeviceEventEmitter.emit("STOP_ALL_VIDEOS");
       await unloadSound();
 
       setCurrentStory(story);

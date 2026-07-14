@@ -54,6 +54,11 @@ export default function VideoScreen() {
   useFocusEffect(
     useCallback(() => {
       pauseAudio();
+
+      return () => {
+        // Leaving Video tab
+        setActiveIndex(-1);
+      };
     }, [pauseAudio])
   );
 
