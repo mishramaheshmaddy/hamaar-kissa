@@ -77,13 +77,26 @@ export default function BulkUpload() {
   const [batchNarrator, setBatchNarrator] = useState("");
   const [batchPublished, setBatchPublished] = useState(true);
   const [fileRows, setFileRows] = useState<FileRow[]>([]);
+  const [thumbnailFiles, setThumbnailFiles] = useState<File[]>([]);
   const [uploadingBatch, setUploadingBatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     setFileRows(files.map((file) => ({ file, status: "pending" })));
   };
+
+  const handleThumbnailsSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setThumbnailFiles(Array.from(e.target.files ?? []));
+  };
+
+  // Matches a media file to a thumbnail by base filename, ignoring
+  // extension and case — e.g. "peepara_wali_chudail.mp3" matches
+  // "peepara_wali_chudail.jpg". No sheet needed for this simpler workflow.
+  const baseName = (filename: string) => filename.replace(/\.[^/.]+$/, "").toLowerCase();
+  const findMatchingThumbnail = (mediaFile: File): File | undefined =>
+    thumbnailFiles.find((t) => baseName(t.name) === baseName(mediaFile.name));
 
   const uploadOneFile = async (file: File): Promise<string> => {
     const formData = new FormData();
@@ -112,6 +125,9 @@ export default function BulkUpload() {
         const url = await uploadOneFile(row.file);
         const title = cleanTitleFromFilename(row.file.name);
 
+        const matchingThumbnail = findMatchingThumbnail(row.file);
+        const thumbnailUrl = matchingThumbnail ? await uploadOneFile(matchingThumbnail) : undefined;
+
         if (contentType === "audio") {
           await createStory.mutateAsync({
             data: {
@@ -120,7 +136,7 @@ export default function BulkUpload() {
               narrator: batchNarrator || "",
               durationSeconds: 0,
               description: "",
-              thumbnailUrl: undefined,
+              thumbnailUrl,
               audioUrl: url,
               sourceType: "upload",
               published: batchPublished,
@@ -133,7 +149,7 @@ export default function BulkUpload() {
               title,
               categoryId: parseInt(batchCategoryId),
               description: "",
-              thumbnailUrl: undefined,
+              thumbnailUrl,
               videoUrl: url,
               sourceType: "upload",
               published: batchPublished,
@@ -309,6 +325,7 @@ export default function BulkUpload() {
   interface MatchSheetRow {
     rowNumber: number;
     filename: string;
+    thumbnailFilename: string;
     title: string;
     categoryName: string;
     categoryId: number | null;
@@ -322,11 +339,13 @@ export default function BulkUpload() {
 
   const [matchRows, setMatchRows] = useState<MatchSheetRow[]>([]);
   const [matchFiles, setMatchFiles] = useState<File[]>([]);
+  const [matchThumbnailFiles, setMatchThumbnailFiles] = useState<File[]>([]);
   const [matchImporting, setMatchImporting] = useState(false);
   const [matchProgress, setMatchProgress] = useState(0);
   const [matchResults, setMatchResults] = useState<Record<string, "pending" | "importing" | "done" | "error">>({});
   const matchSheetInputRef = useRef<HTMLInputElement>(null);
   const matchFilesInputRef = useRef<HTMLInputElement>(null);
+  const matchThumbnailInputRef = useRef<HTMLInputElement>(null);
 
   const handleMatchSheetSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -349,6 +368,7 @@ export default function BulkUpload() {
           };
 
           const filename = get("filename", "file", "file name");
+          const thumbnailFilename = get("thumbnailfilename", "thumbnail filename", "thumbnail file");
           const title = get("title", "naam", "name");
           const categoryName = get("category", "categoryname", "kism");
           const narrator = get("narrator");
@@ -370,6 +390,7 @@ export default function BulkUpload() {
           return {
             rowNumber: idx + 2,
             filename,
+            thumbnailFilename,
             title,
             categoryName,
             categoryId: category?.id ?? null,
@@ -396,10 +417,17 @@ export default function BulkUpload() {
     setMatchResults({});
   };
 
+  const handleMatchThumbnailsSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMatchThumbnailFiles(Array.from(e.target.files ?? []));
+  };
+
   // Exact, case-insensitive filename matching — deterministic, no guessing.
   const matchedPairs = matchRows.map((row) => {
     const file = matchFiles.find((f) => f.name.toLowerCase() === row.filename.toLowerCase());
-    return { row, file: file ?? null };
+    const thumbnailFile = row.thumbnailFilename
+      ? matchThumbnailFiles.find((f) => f.name.toLowerCase() === row.thumbnailFilename.toLowerCase())
+      : undefined;
+    return { row, file: file ?? null, thumbnailFile: thumbnailFile ?? null };
   });
   const unmatchedFiles = matchFiles.filter(
     (f) => !matchRows.some((r) => r.filename.toLowerCase() === f.name.toLowerCase())
@@ -411,11 +439,14 @@ export default function BulkUpload() {
     let succeeded = 0;
     let failed = 0;
 
-    for (const { row, file } of matchedPairs) {
+    for (const { row, file, thumbnailFile } of matchedPairs) {
       if (!file || row.errors.length > 0) continue;
       setMatchResults((prev) => ({ ...prev, [row.filename]: "importing" }));
       try {
         const url = await uploadOneFile(file);
+        // Prefer an actual matched thumbnail file over a plain thumbnailUrl
+        // column, if both happen to be present.
+        const thumbnailUrl = thumbnailFile ? await uploadOneFile(thumbnailFile) : (row.thumbnailUrl || undefined);
         if (contentType === "audio") {
           await createStory.mutateAsync({
             data: {
@@ -424,7 +455,7 @@ export default function BulkUpload() {
               narrator: row.narrator,
               durationSeconds: row.durationSeconds,
               description: row.description,
-              thumbnailUrl: row.thumbnailUrl || undefined,
+              thumbnailUrl,
               audioUrl: url,
               sourceType: "upload",
               published: row.published,
@@ -437,7 +468,7 @@ export default function BulkUpload() {
               title: row.title,
               categoryId: row.categoryId!,
               description: row.description,
-              thumbnailUrl: row.thumbnailUrl || undefined,
+              thumbnailUrl,
               videoUrl: url,
               sourceType: "upload",
               published: row.published,
@@ -548,11 +579,43 @@ export default function BulkUpload() {
                 </p>
               </div>
 
+              <div>
+                <Label>Select thumbnail images (optional)</Label>
+                <div className="mt-1 flex items-center gap-3">
+                  <Button type="button" variant="outline" className="gap-2" onClick={() => thumbnailInputRef.current?.click()}>
+                    <UploadCloud className="w-4 h-4" /> Choose Thumbnails
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {thumbnailFiles.length > 0 ? `${thumbnailFiles.length} image${thumbnailFiles.length === 1 ? "" : "s"} selected` : "No files chosen"}
+                  </span>
+                </div>
+                <input
+                  ref={thumbnailInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleThumbnailsSelected}
+                  className="hidden"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Matched to a media file by same filename (ignoring extension) — e.g. <code>chudail.mp3</code> pairs automatically with <code>chudail.jpg</code>. Files without a matching thumbnail just won't have one; you can add it later.
+                </p>
+              </div>
+
               {fileRows.length > 0 && (
                 <div className="border rounded-lg divide-y">
-                  {fileRows.map((row, i) => (
+                  {fileRows.map((row, i) => {
+                    const thumb = findMatchingThumbnail(row.file);
+                    return (
                     <div key={i} className="flex items-center justify-between px-4 py-2 text-sm">
                       <span className="truncate flex-1">{cleanTitleFromFilename(row.file.name)}</span>
+                      <span className="ml-2 flex items-center gap-1">
+                        {thumb ? (
+                          <Badge variant="outline" className="gap-1"><CheckCircle2 className="w-3 h-3 text-green-600" /> Thumbnail matched</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No thumbnail</span>
+                        )}
+                      </span>
                       <span className="ml-3 flex items-center gap-1">
                         {row.status === "pending" && <Badge variant="outline">Pending</Badge>}
                         {row.status === "uploading" && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
@@ -564,7 +627,8 @@ export default function BulkUpload() {
                         )}
                       </span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -674,12 +738,12 @@ export default function BulkUpload() {
                   precise, case-insensitive comparison, and you'll see exactly what matched before anything is created.
                 </p>
                 <p className="font-mono text-xs bg-muted p-2 rounded">
-                  filename, title, category, narrator (optional), description (optional), thumbnailUrl (optional), durationSeconds (optional), published (optional)
+                  filename, title, category, thumbnailFilename (optional), narrator (optional), description (optional), thumbnailUrl (optional), durationSeconds (optional), published (optional)
                 </p>
                 <p><strong>filename</strong> must exactly match the name of a file you select below (e.g. <code>peepara_wali_chudail.mp3</code>).</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Step 1 — Select the sheet</Label>
                   <div className="mt-1 flex items-center gap-3">
@@ -717,6 +781,26 @@ export default function BulkUpload() {
                     {matchFiles.length > 0 ? `${matchFiles.length} files selected.` : "No files chosen"}
                   </p>
                 </div>
+                <div>
+                  <Label>Step 3 — Select thumbnails (optional)</Label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <Button type="button" variant="outline" className="gap-2" onClick={() => matchThumbnailInputRef.current?.click()}>
+                      <UploadCloud className="w-4 h-4" /> Choose Thumbnails
+                    </Button>
+                  </div>
+                  <input
+                    ref={matchThumbnailInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleMatchThumbnailsSelected}
+                    className="hidden"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {matchThumbnailFiles.length > 0 ? `${matchThumbnailFiles.length} images selected.` : "No files chosen"}
+                    {" "}Matched via your sheet's <code>thumbnailFilename</code> column.
+                  </p>
+                </div>
               </div>
 
               {matchRows.length > 0 && matchFiles.length > 0 && (
@@ -739,16 +823,28 @@ export default function BulkUpload() {
                           <TableHead>Filename</TableHead>
                           <TableHead>Title</TableHead>
                           <TableHead>Category</TableHead>
+                          <TableHead>Thumbnail</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {matchedPairs.map(({ row, file }) => (
+                        {matchedPairs.map(({ row, file, thumbnailFile }) => (
                           <TableRow key={row.rowNumber}>
                             <TableCell>{row.rowNumber}</TableCell>
                             <TableCell className="max-w-[180px] truncate font-mono text-xs">{row.filename || <em className="text-muted-foreground">missing</em>}</TableCell>
                             <TableCell className="max-w-[180px] truncate">{row.title}</TableCell>
                             <TableCell>{row.categoryName}</TableCell>
+                            <TableCell>
+                              {thumbnailFile ? (
+                                <Badge variant="outline" className="gap-1"><CheckCircle2 className="w-3 h-3 text-green-600" /> Matched</Badge>
+                              ) : row.thumbnailFilename ? (
+                                <span className="text-xs text-red-600">Not found</span>
+                              ) : row.thumbnailUrl ? (
+                                <span className="text-xs text-muted-foreground">URL</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">None</span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               {matchResults[row.filename] === "done" && <Badge className="gap-1"><CheckCircle2 className="w-3 h-3" /> Imported</Badge>}
                               {matchResults[row.filename] === "importing" && <Loader2 className="w-4 h-4 animate-spin" />}
