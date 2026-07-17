@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useListAudioStories, useUpdateAudioStory, useDeleteAudioStory, getListAudioStoriesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -5,16 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Music, Plus, Pencil, Trash2, Loader2, PlayCircle } from "lucide-react";
+import { Music, Plus, Pencil, Trash2, Loader2, PlayCircle, Search } from "lucide-react";
 
 export default function AudioStories() {
   const { data: stories, isLoading } = useListAudioStories();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+  const [search, setSearch] = useState("");
+
   const updateStory = useUpdateAudioStory();
   const deleteStory = useDeleteAudioStory();
+
+  const filteredStories = useMemo(() => {
+    if (!stories) return stories;
+    const q = search.trim().toLowerCase();
+    if (!q) return stories;
+    return stories.filter((story: any) =>
+      story.title?.toLowerCase().includes(q) ||
+      story.categoryName?.toLowerCase().includes(q) ||
+      story.narrator?.toLowerCase().includes(q)
+    );
+  }, [stories, search]);
 
   const handleTogglePublished = (id: number, published: boolean) => {
     updateStory.mutate(
@@ -65,6 +78,16 @@ export default function AudioStories() {
         </Button>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background"
+          placeholder="Search by title, category, or narrator..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -75,9 +98,13 @@ export default function AudioStories() {
             <div className="p-8 text-center text-muted-foreground">
               No audio stories found.
             </div>
+          ) : !filteredStories?.length ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No audio stories match "{search}".
+            </div>
           ) : (
             <div className="divide-y">
-              {stories.map((story) => (
+              {filteredStories.map((story) => (
                 <div key={story.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-muted rounded-md overflow-hidden relative flex-shrink-0 flex items-center justify-center">

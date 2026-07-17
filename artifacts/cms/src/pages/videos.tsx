@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useListVideos, useUpdateVideo, useDeleteVideo, getListVideosQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -5,16 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Video as VideoIcon, Plus, Pencil, Trash2, Loader2, PlayCircle, Eye } from "lucide-react";
+import { Video as VideoIcon, Plus, Pencil, Trash2, Loader2, PlayCircle, Eye, Search } from "lucide-react";
 
 export default function Videos() {
   const { data: videos, isLoading } = useListVideos();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+  const [search, setSearch] = useState("");
+
   const updateVideo = useUpdateVideo();
   const deleteVideo = useDeleteVideo();
+
+  const filteredVideos = useMemo(() => {
+    if (!videos) return videos;
+    const q = search.trim().toLowerCase();
+    if (!q) return videos;
+    return videos.filter((video: any) =>
+      video.title?.toLowerCase().includes(q) ||
+      video.categoryName?.toLowerCase().includes(q)
+    );
+  }, [videos, search]);
 
   const handleTogglePublished = (id: number, published: boolean) => {
     updateVideo.mutate(
@@ -59,6 +71,16 @@ export default function Videos() {
         </Button>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background"
+          placeholder="Search by title or category..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -69,9 +91,13 @@ export default function Videos() {
             <div className="p-8 text-center text-muted-foreground">
               No videos found.
             </div>
+          ) : !filteredVideos?.length ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No videos match "{search}".
+            </div>
           ) : (
             <div className="divide-y">
-              {videos.map((video) => (
+              {filteredVideos.map((video) => (
                 <div key={video.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-4 w-1/2">
                     <div className="w-24 h-16 bg-muted rounded-md overflow-hidden relative flex-shrink-0 flex items-center justify-center">
