@@ -421,16 +421,19 @@ export default function BulkUpload() {
     setMatchThumbnailFiles(Array.from(e.target.files ?? []));
   };
 
-  // Exact, case-insensitive filename matching — deterministic, no guessing.
+  // Matches by filename ignoring extension — so a sheet can say
+  // "Kaal_Bhairav_bhojpuri" and match "Kaal_Bhairav_bhojpuri.mp3" without
+  // needing the extension typed out. Still an exact match on the name
+  // itself, just extension-independent — not fuzzy/similarity matching.
   const matchedPairs = matchRows.map((row) => {
-    const file = matchFiles.find((f) => f.name.toLowerCase() === row.filename.toLowerCase());
+    const file = matchFiles.find((f) => baseName(f.name) === baseName(row.filename));
     const thumbnailFile = row.thumbnailFilename
-      ? matchThumbnailFiles.find((f) => f.name.toLowerCase() === row.thumbnailFilename.toLowerCase())
+      ? matchThumbnailFiles.find((f) => baseName(f.name) === baseName(row.thumbnailFilename))
       : undefined;
     return { row, file: file ?? null, thumbnailFile: thumbnailFile ?? null };
   });
   const unmatchedFiles = matchFiles.filter(
-    (f) => !matchRows.some((r) => r.filename.toLowerCase() === f.name.toLowerCase())
+    (f) => !matchRows.some((r) => baseName(r.filename) === baseName(f.name))
   );
   const readyCount = matchedPairs.filter((p) => p.file && p.row.errors.length === 0).length;
 
@@ -740,7 +743,7 @@ export default function BulkUpload() {
                 <p className="font-mono text-xs bg-muted p-2 rounded">
                   filename, title, category, thumbnailFilename (optional), narrator (optional), description (optional), thumbnailUrl (optional), durationSeconds (optional), published (optional)
                 </p>
-                <p><strong>filename</strong> must exactly match the name of a file you select below (e.g. <code>peepara_wali_chudail.mp3</code>).</p>
+                <p><strong>filename</strong> must match the name of a file you select below — the extension is optional (e.g. <code>peepara_wali_chudail</code> matches <code>peepara_wali_chudail.mp3</code>).</p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
