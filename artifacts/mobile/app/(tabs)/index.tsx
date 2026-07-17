@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -65,6 +65,24 @@ function mapVideo(v: ApiVideo, catMap: Record<number, string>): VideoItem {
   };
 }
 
+// Fisher-Yates shuffle — used to populate the "सब" (all content) section
+// haphazardly, so it doesn't just repeat the same order as the manual
+// home sections above it.
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const ALL_SECTION_PAGE_SIZE = 8;
+
+type CombinedCard =
+  | { kind: "audio"; key: string; story: AudioStory }
+  | { kind: "video"; key: string; video: VideoItem };
+
 interface HomeSectionItem {
   id: number;
   title: string;
@@ -105,19 +123,29 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Everything published, used to populate the "सब" section at the very
+  // bottom of the feed once the manually-curated sections run out.
+  const [allAudioRaw, setAllAudioRaw] = useState<ApiAudioStory[]>([]);
+  const [allVideoRaw, setAllVideoRaw] = useState<ApiVideo[]>([]);
+  const [allVisibleCount, setAllVisibleCount] = useState(ALL_SECTION_PAGE_SIZE);
+
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [homeSections, allCats] = await Promise.all([
+        const [homeSections, allCats, audioStories, videos] = await Promise.all([
           apiFetch<HomeSectionItem[]>("/api/home-sections"),
           apiFetch<ApiCategory[]>("/api/categories"),
+          apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
+          apiFetch<ApiVideo[]>("/api/videos?published=true"),
         ]);
         if (cancelled) return;
         setSections(homeSections);
         setCategories(allCats);
+        setAllAudioRaw(audioStories);
+        setAllVideoRaw(videos);
       } catch (_e) {
       } finally {
         if (!cancelled) setLoading(false);
@@ -125,6 +153,28 @@ export default function HomeScreen() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const catMap = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const c of categories) m[c.id] = c.name;
+    return m;
+  }, [categories]);
+
+  // Shuffled once per data load (not on every render, so the order doesn't
+  // jump around as the user taps "सब देखी...").
+  const allCards = useMemo<CombinedCard[]>(() => {
+    const audioCards: CombinedCard[] = allAudioRaw.map((s) => ({
+      kind: "audio",
+      key: `a-${s.id}`,
+      story: mapStory(s, catMap),
+    }));
+    const videoCards: CombinedCard[] = allVideoRaw.map((v) => ({
+      kind: "video",
+      key: `v-${v.id}`,
+      video: mapVideo(v, catMap),
+    }));
+    return shuffleArray([...audioCards, ...videoCards]);
+  }, [allAudioRaw, allVideoRaw, catMap]);
 
 
   const renderSection = (section: HomeSectionItem) => {
@@ -263,7 +313,67 @@ export default function HomeScreen() {
 {sections.map((section) => (
               <View key={section.id}>{renderSection(section)}</View>
             ))}
-            {sections.length === 0 && (
+
+            {allCards.length > 0 && (
+              <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
+                <Text style={[styles.allSectionTitle, { color: colors.foreground }]}>सब 🎉</Text>
+                <Text style={[styles.allSectionSubtitle, { color: colors.mutedForeground }]}>
+                  सारा कहानी अउर वीडियो, एक्कही जगह
+                </Text>
+
+                <View style={styles.allGrid}>
+                  {allCards.slice(0, allVisibleCount).map((card) => {
+                    if (card.kind === "audio") {
+                      return (
+                        <View key={card.key} style={styles.allGridItem}>
+                          <AudioCard
+                            story={card.story}
+                            onPress={() => { playStory(card.story); router.push("/audio/player"); }}
+                            isPlaying={currentStory?.id === card.story.id && isPlaying}
+                          />
+                        </View>
+                      );
+                    }
+                    return (
+                      <TouchableOpacity
+                        key={card.key}
+                        onPress={() => router.push(`/video/${card.video.id}` as any)}
+                        activeOpacity={0.85}
+                        style={[styles.allVideoCard, { backgroundColor: "#1C1208" }]}
+                      >
+                        {card.video.thumbnail ? (
+                          <Image source={{ uri: card.video.thumbnail }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                        ) : (
+                          <Text style={styles.videoThumbIcon}>
+                            {VIDEO_CATEGORY_ICONS[card.video.category] ?? "🎬"}
+                          </Text>
+                        )}
+                        <View style={styles.videoOverlay} />
+                        <View style={styles.allVideoPlayBadge}>
+                          <Feather name="play" size={11} color="#fff" />
+                        </View>
+                        <View style={styles.videoInfo}>
+                          <Text style={styles.videoTitle} numberOfLines={2}>{card.video.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {allVisibleCount < allCards.length && (
+                  <TouchableOpacity
+                    onPress={() => setAllVisibleCount((c) => c + ALL_SECTION_PAGE_SIZE)}
+                    activeOpacity={0.85}
+                    style={[styles.seeAllBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.seeAllBtnText, { color: colors.primary }]}>सब देखी...</Text>
+                    <Feather name="chevron-down" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {sections.length === 0 && allCards.length === 0 && (
               <View style={styles.empty}>
                 <Feather name="inbox" size={48} color={colors.mutedForeground} />
                 <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -304,4 +414,43 @@ const styles = StyleSheet.create({
   videoTitle: { color: "#fff", fontSize: 13, fontWeight: "700", lineHeight: 18 },
   empty: { alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 16 },
   emptyText: { fontSize: 15, textAlign: "center", lineHeight: 24 },
+  allSectionTitle: { fontSize: 19, fontWeight: "900", letterSpacing: -0.3 },
+  allSectionSubtitle: { fontSize: 13, marginTop: 2, marginBottom: 14 },
+  // Plain flexWrap grid (not a nested FlatList) so it naturally lays out
+  // however many cards fit the screen width, and doesn't fight the outer
+  // ScrollView for vertical scroll gestures.
+  allGrid: { flexDirection: "row", flexWrap: "wrap" },
+  allGridItem: { marginBottom: 16 },
+  allVideoCard: {
+    width: 160,
+    aspectRatio: 1,
+    borderRadius: 16,
+    marginRight: 12,
+    marginBottom: 16,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  allVideoPlayBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  seeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  seeAllBtnText: { fontSize: 14, fontWeight: "700" },
 });

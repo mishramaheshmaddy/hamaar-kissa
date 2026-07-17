@@ -38,6 +38,31 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+// Reads real duration client-side from the selected audio file, so
+// "Duration (Seconds)" doesn't have to be typed in by hand.
+function readAudioDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    try {
+      const audio = new Audio();
+      const url = URL.createObjectURL(file);
+      const cleanup = () => URL.revokeObjectURL(url);
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () => {
+        const seconds = Number.isFinite(audio.duration) ? Math.round(audio.duration) : 0;
+        cleanup();
+        resolve(seconds);
+      };
+      audio.onerror = () => {
+        cleanup();
+        resolve(0);
+      };
+      audio.src = url;
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
 export default function AudioStoryForm() {
   const [, setLocation] = useLocation();
   const params = useParams();
@@ -138,6 +163,17 @@ export default function AudioStoryForm() {
     if (!file) return;
 
     setIsUploading(true);
+
+    // Audio duration is read from the file itself before uploading, so the
+    // Duration field fills in automatically instead of being typed by hand.
+    if (fieldName === "audioUrl") {
+      readAudioDurationSeconds(file).then((seconds) => {
+        if (seconds > 0) {
+          form.setValue("durationSeconds", seconds);
+        }
+      });
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -250,7 +286,7 @@ export default function AudioStoryForm() {
                   name="durationSeconds"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Duration (Seconds)</FormLabel>
+                      <FormLabel>Duration (Seconds) — auto-fills on upload</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="e.g. 180" {...field} />
                       </FormControl>
