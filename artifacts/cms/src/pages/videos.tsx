@@ -24,7 +24,8 @@ export default function Videos() {
     if (!q) return videos;
     return videos.filter((video: any) =>
       video.title?.toLowerCase().includes(q) ||
-      video.categoryName?.toLowerCase().includes(q)
+      video.categoryName?.toLowerCase().includes(q) ||
+      video.searchTags?.toLowerCase().includes(q)
     );
   }, [videos, search]);
 

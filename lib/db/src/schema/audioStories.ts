@@ -12,6 +12,7 @@ export const audioStoriesTable = pgTable("audio_stories", {
   thumbnailUrl: text("thumbnail_url"),
   audioUrl: text("audio_url").notNull(),
   sourceType: text("source_type").notNull().default("url"),
+  searchTags: text("search_tags").notNull().default(""),
   published: boolean("published").notNull().default(false),
   homeSectionId: integer("home_section_id"),
   sortOrder: integer("sort_order").notNull().default(0),

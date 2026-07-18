@@ -45,10 +45,11 @@ export default function SearchScreen() {
       ? audio
       : videos;
 
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
     return list.filter(item =>
-      item.title
-        ?.toLowerCase()
-        .includes(query.toLowerCase())
+      item.title?.toLowerCase().includes(q) ||
+      item.searchTags?.toLowerCase().includes(q)
     );
 
   }, [query, tab, audio, videos]);

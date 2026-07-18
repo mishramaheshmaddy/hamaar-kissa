@@ -539,6 +539,8 @@ components:
           type: string
         sourceType:
           type: string
+        searchTags:
+          type: string
         published:
           type: boolean
         sortOrder:
@@ -568,6 +570,8 @@ components:
           type: string
         sourceType:
           type: string
+        searchTags:
+          type: string
         published:
           type: boolean
         sortOrder:
@@ -591,6 +595,8 @@ components:
         audioUrl:
           type: string
         sourceType:
+          type: string
+        searchTags:
           type: string
         published:
           type: boolean
@@ -619,6 +625,8 @@ components:
           type: string
         youtubeId:
           type: ["string", "null"]
+        searchTags:
+          type: string
         views:
           type: integer
         published:
@@ -648,6 +656,8 @@ components:
           type: string
         youtubeId:
           type: ["string", "null"]
+        searchTags:
+          type: string
         views:
           type: integer
         published:
@@ -672,6 +682,8 @@ components:
           type: string
         youtubeId:
           type: ["string", "null"]
+        searchTags:
+          type: string
         views:
           type: integer
         published:

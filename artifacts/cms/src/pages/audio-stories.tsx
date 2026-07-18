@@ -25,7 +25,8 @@ export default function AudioStories() {
     return stories.filter((story: any) =>
       story.title?.toLowerCase().includes(q) ||
       story.categoryName?.toLowerCase().includes(q) ||
-      story.narrator?.toLowerCase().includes(q)
+      story.narrator?.toLowerCase().includes(q) ||
+      story.searchTags?.toLowerCase().includes(q)
     );
   }, [stories, search]);
 

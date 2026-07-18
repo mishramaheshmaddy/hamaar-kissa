@@ -34,6 +34,7 @@ interface SheetRow {
   description: string;
   thumbnailUrl: string;
   durationSeconds: number;
+  searchTags: string;
   published: boolean;
   errors: string[];
 }
@@ -161,6 +162,7 @@ export default function BulkUpload() {
           const description = get("description", "vivaran");
           const thumbnailUrl = get("thumbnailurl", "thumbnail url", "image");
           const durationSeconds = Number(get("durationseconds", "duration")) || 0;
+          const searchTags = get("searchtags", "search tags", "keywords", "aliases");
           const published = parseBoolean(get("published"), publishDefault);
 
           const category = categories.find(
@@ -184,6 +186,7 @@ export default function BulkUpload() {
             description,
             thumbnailUrl,
             durationSeconds,
+            searchTags,
             published,
             errors,
           };
@@ -268,6 +271,7 @@ export default function BulkUpload() {
               thumbnailUrl,
               audioUrl: url,
               sourceType: "upload",
+              searchTags: row.searchTags,
               published: row.published,
               sortOrder: 0,
             } as any,
@@ -281,6 +285,7 @@ export default function BulkUpload() {
               thumbnailUrl,
               videoUrl: url,
               sourceType: "upload",
+              searchTags: row.searchTags,
               published: row.published,
               sortOrder: 0,
             } as any,
@@ -340,7 +345,8 @@ export default function BulkUpload() {
             <p className="font-mono text-xs bg-muted p-2 rounded">
               filename, title, category, thumbnailFilename (optional), narrator (optional), description (optional),
               thumbnailUrl (optional — used only if no thumbnailFilename file is matched), durationSeconds (optional —
-              auto-detected from the audio file if left blank), published (optional)
+              auto-detected from the audio file if left blank), searchTags (optional — comma-separated Hinglish/English
+              spellings to help search), published (optional)
             </p>
           </div>
 

@@ -19,6 +19,7 @@ export interface AudioStory {
   thumbnailUrl: string | null;
   audioUrl: string;
   sourceType: string;
+  searchTags: string;
   published: boolean;
   sortOrder: number;
   createdAt: string;

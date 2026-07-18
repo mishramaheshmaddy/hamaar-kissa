@@ -31,6 +31,7 @@ const schema = z.object({
   thumbnailUrl: z.string().optional(),
   audioUrl: z.string().min(1, "Audio URL is required"),
   sourceType: z.string().min(1, "Source type is required"),
+  searchTags: z.string().optional(),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
   homeSectionId: z.coerce.number().optional(),
@@ -103,6 +104,7 @@ export default function AudioStoryForm() {
       thumbnailUrl: "",
       audioUrl: "",
       sourceType: "upload",
+      searchTags: "",
       published: false,
       sortOrder: 0,
       homeSectionId: undefined,
@@ -120,6 +122,7 @@ export default function AudioStoryForm() {
         thumbnailUrl: story.thumbnailUrl || "",
         audioUrl: story.audioUrl,
         sourceType: story.sourceType,
+        searchTags: story.searchTags || "",
         published: story.published,
         sortOrder: story.sortOrder,
         homeSectionId: story.homeSectionId || undefined,
@@ -305,6 +308,27 @@ export default function AudioStoryForm() {
                     <FormControl>
                       <Textarea placeholder="Story description" rows={4} {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="searchTags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Search Keywords (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Alternate spellings people might search, comma-separated e.g. peepara wali chudail, pipra wali chudail, bhoot pret kahani"
+                        rows={2}
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-sm text-muted-foreground">
+                      Add English/Hinglish spellings so people find this story even if they don't type it in Devanagari.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -19,6 +19,7 @@ export interface Video {
   sourceType: string;
   /** @nullable */
   youtubeId: string | null;
+  searchTags: string;
   views: number;
   published: boolean;
   sortOrder: number;

@@ -11,6 +11,7 @@ export const videosTable = pgTable("videos", {
   videoUrl: text("video_url").notNull(),
   sourceType: text("source_type").notNull().default("url"),
   youtubeId: text("youtube_id"),
+  searchTags: text("search_tags").notNull().default(""),
   views: integer("views").notNull().default(0),
   homeSectionId: integer("home_section_id"),
   published: boolean("published").notNull().default(false),

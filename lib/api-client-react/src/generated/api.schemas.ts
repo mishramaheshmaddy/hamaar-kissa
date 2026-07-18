@@ -60,6 +60,7 @@ export interface AudioStory {
   thumbnailUrl: string | null;
   audioUrl: string;
   sourceType: string;
+  searchTags: string;
   published: boolean;
   sortOrder: number;
   createdAt: string;
@@ -77,6 +78,7 @@ export interface AudioStoryInput {
   thumbnailUrl?: string | null;
   audioUrl: string;
   sourceType: string;
+  searchTags?: string;
   published?: boolean;
   sortOrder?: number;
 }
@@ -92,6 +94,7 @@ export interface AudioStoryUpdate {
   thumbnailUrl?: string | null;
   audioUrl?: string;
   sourceType?: string;
+  searchTags?: string;
   published?: boolean;
   sortOrder?: number;
 }
@@ -110,6 +113,7 @@ export interface Video {
   sourceType: string;
   /** @nullable */
   youtubeId: string | null;
+  searchTags: string;
   views: number;
   published: boolean;
   sortOrder: number;
@@ -128,6 +132,7 @@ export interface VideoInput {
   sourceType: string;
   /** @nullable */
   youtubeId?: string | null;
+  searchTags?: string;
   views?: number;
   published?: boolean;
   sortOrder?: number;
@@ -144,6 +149,7 @@ export interface VideoUpdate {
   sourceType?: string;
   /** @nullable */
   youtubeId?: string | null;
+  searchTags?: string;
   views?: number;
   published?: boolean;
   sortOrder?: number;

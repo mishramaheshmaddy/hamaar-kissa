@@ -30,6 +30,7 @@ const schema = z.object({
   videoUrl: z.string().min(1, "Video URL is required"),
   sourceType: z.string().min(1, "Source type is required"),
   youtubeId: z.string().optional().nullable(),
+  searchTags: z.string().optional(),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
 });
@@ -67,6 +68,7 @@ export default function VideoForm() {
       videoUrl: "",
       sourceType: "youtube",
       youtubeId: "",
+      searchTags: "",
       published: false,
       sortOrder: 0,
     },
@@ -82,6 +84,7 @@ export default function VideoForm() {
         videoUrl: video.videoUrl,
         sourceType: video.sourceType,
         youtubeId: video.youtubeId,
+        searchTags: video.searchTags || "",
         published: video.published,
         sortOrder: video.sortOrder,
       });
@@ -319,6 +322,27 @@ export default function VideoForm() {
                     <FormControl>
                       <Textarea placeholder="Video description" rows={4} {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="searchTags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Search Keywords (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Alternate spellings people might search, comma-separated e.g. peepara wali chudail, pipra wali chudail, bhoot pret kahani"
+                        rows={2}
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-sm text-muted-foreground">
+                      Add English/Hinglish spellings so people find this video even if they don't type it in Devanagari.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

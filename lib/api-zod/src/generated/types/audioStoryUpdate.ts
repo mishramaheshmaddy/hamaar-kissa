@@ -16,6 +16,7 @@ export interface AudioStoryUpdate {
   thumbnailUrl?: string | null;
   audioUrl?: string;
   sourceType?: string;
+  searchTags?: string;
   published?: boolean;
   sortOrder?: number;
 }
