@@ -87,7 +87,10 @@ export default function AudioScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.background }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>सुनल के कहानी</Text>
-        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: colors.secondary }]}>
+        <TouchableOpacity
+          style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
+          onPress={() => router.push("/search" as any)}
+        >
           <Feather name="search" size={20} color={colors.foreground} />
         </TouchableOpacity>
       </View>
