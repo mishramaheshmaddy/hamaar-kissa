@@ -11,6 +11,8 @@ import {
   Share,
   Alert,
   Platform,
+  StyleProp,
+  ViewStyle,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -27,6 +29,9 @@ interface AudioCardProps {
   onPress: () => void;
   isPlaying?: boolean;
   compact?: boolean;
+  // Lets callers (e.g. a responsive 2-column grid) override the card's
+  // fixed 160px width/margin used by the default horizontal-scroll lists.
+  style?: StyleProp<ViewStyle>;
 }
 
 function formatDuration(seconds: number): string {
@@ -74,7 +79,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   drama: "नाटक",
 };
 
-export default function AudioCard({ story, onPress, isPlaying, compact }: AudioCardProps) {
+export default function AudioCard({ story, onPress, isPlaying, compact, style }: AudioCardProps) {
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();
@@ -295,7 +300,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact }: AudioC
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
-      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, style]}
     >
       <View style={[styles.thumbnail, { backgroundColor: gradient[1] }]}>
         {thumbUri ? (

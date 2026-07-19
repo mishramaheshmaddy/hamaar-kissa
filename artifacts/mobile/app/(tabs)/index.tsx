@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAudio } from "@/context/AudioContext";
@@ -19,9 +20,8 @@ import AudioCard from "@/components/AudioCard";
 import SectionHeader from "@/components/SectionHeader";
 import MiniPlayer from "@/components/MiniPlayer";
 import { Image } from "expo-image";
-import { apiFetch, ApiAudioStory, ApiVideo, ApiCategory, BASE } from "@/lib/api";
+import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
 import { AudioStory } from "@/context/AudioContext";
-import { VideoItem } from "@/data/mockData";
 import { CATEGORY_ICONS as VIDEO_CATEGORY_ICONS } from "@/components/VideoCard";
 import { useAuth } from "@/context/AuthContext";
 import { useDownloads } from "@/hooks/useDownloads";
@@ -47,24 +47,6 @@ function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory 
   };
 }
 
-function mapVideo(v: ApiVideo, catMap: Record<number, string>): VideoItem {
-  return {
-    id: String(v.id),
-    title: v.title,
-    category: v.categoryId ? (catMap[v.categoryId] ?? "other") : "other",
-    categoryId: v.categoryId ?? undefined,
-    views: "0",
-    likes: 0,
-    creator: "",
-    thumbnail: v.thumbnailUrl ?? "",
-    duration: 0,
-    description: v.description,
-    youtubeId: v.youtubeId ?? undefined,
-    videoUrl: v.videoUrl ?? undefined,
-    sourceType: v.sourceType,
-  };
-}
-
 // Fisher-Yates shuffle — used to populate the "सब" (all content) section
 // haphazardly, so it doesn't just repeat the same order as the manual
 // home sections above it.
@@ -78,10 +60,6 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 const ALL_SECTION_PAGE_SIZE = 8;
-
-type CombinedCard =
-  | { kind: "audio"; key: string; story: AudioStory }
-  | { kind: "video"; key: string; video: VideoItem };
 
 interface HomeSectionItem {
   id: number;
@@ -125,27 +103,32 @@ export default function HomeScreen() {
 
   // Everything published, used to populate the "सब" section at the very
   // bottom of the feed once the manually-curated sections run out.
+  // Audio-only by design — "सब" is the all-stories feed, video content
+  // lives in its own tab/section.
   const [allAudioRaw, setAllAudioRaw] = useState<ApiAudioStory[]>([]);
-  const [allVideoRaw, setAllVideoRaw] = useState<ApiVideo[]>([]);
   const [allVisibleCount, setAllVisibleCount] = useState(ALL_SECTION_PAGE_SIZE);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const { width: windowWidth } = useWindowDimensions();
+  // Two equal columns inside the 16px screen padding with a 12px gutter
+  // between them — computed responsively so it doesn't overflow to a
+  // single column on narrower ~360dp Android screens.
+  const GRID_GAP = 12;
+  const gridCardWidth = (windowWidth - 16 * 2 - GRID_GAP) / 2;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [homeSections, allCats, audioStories, videos] = await Promise.all([
+        const [homeSections, allCats, audioStories] = await Promise.all([
           apiFetch<HomeSectionItem[]>("/api/home-sections"),
           apiFetch<ApiCategory[]>("/api/categories"),
           apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-          apiFetch<ApiVideo[]>("/api/videos?published=true"),
         ]);
         if (cancelled) return;
         setSections(homeSections);
         setCategories(allCats);
         setAllAudioRaw(audioStories);
-        setAllVideoRaw(videos);
       } catch (_e) {
       } finally {
         if (!cancelled) setLoading(false);
@@ -162,19 +145,10 @@ export default function HomeScreen() {
 
   // Shuffled once per data load (not on every render, so the order doesn't
   // jump around as the user taps "सब देखी...").
-  const allCards = useMemo<CombinedCard[]>(() => {
-    const audioCards: CombinedCard[] = allAudioRaw.map((s) => ({
-      kind: "audio",
-      key: `a-${s.id}`,
-      story: mapStory(s, catMap),
-    }));
-    const videoCards: CombinedCard[] = allVideoRaw.map((v) => ({
-      kind: "video",
-      key: `v-${v.id}`,
-      video: mapVideo(v, catMap),
-    }));
-    return shuffleArray([...audioCards, ...videoCards]);
-  }, [allAudioRaw, allVideoRaw, catMap]);
+  const allCards = useMemo<AudioStory[]>(() => {
+    const audioCards = allAudioRaw.map((s) => mapStory(s, catMap));
+    return shuffleArray(audioCards);
+  }, [allAudioRaw, catMap]);
 
 
   const renderSection = (section: HomeSectionItem) => {
@@ -315,56 +289,26 @@ export default function HomeScreen() {
             ))}
 
             {allCards.length > 0 && (
-              <View style={{ marginTop: 28, paddingHorizontal: 16 }}>
-                <Text style={[styles.allSectionTitle, { color: colors.foreground }]}>सब 🎉</Text>
-                <Text style={[styles.allSectionSubtitle, { color: colors.mutedForeground }]}>
-                  सारा कहानी अउर वीडियो, एक्कही जगह
-                </Text>
+              <View style={{ marginTop: 28 }}>
+                <SectionHeader title="सब 🎉" />
 
-                <View style={styles.allGrid}>
-                  {allCards.slice(0, allVisibleCount).map((card) => {
-                    if (card.kind === "audio") {
-                      return (
-                        <View key={card.key} style={styles.allGridItem}>
-                          <AudioCard
-                            story={card.story}
-                            onPress={() => { playStory(card.story); router.push("/audio/player"); }}
-                            isPlaying={currentStory?.id === card.story.id && isPlaying}
-                          />
-                        </View>
-                      );
-                    }
-                    return (
-                      <TouchableOpacity
-                        key={card.key}
-                        onPress={() => router.push(`/video/${card.video.id}` as any)}
-                        activeOpacity={0.85}
-                        style={[styles.allVideoCard, { backgroundColor: "#1C1208" }]}
-                      >
-                        {card.video.thumbnail ? (
-                          <Image source={{ uri: card.video.thumbnail }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                        ) : (
-                          <Text style={styles.videoThumbIcon}>
-                            {VIDEO_CATEGORY_ICONS[card.video.category] ?? "🎬"}
-                          </Text>
-                        )}
-                        <View style={styles.videoOverlay} />
-                        <View style={styles.allVideoPlayBadge}>
-                          <Feather name="play" size={11} color="#fff" />
-                        </View>
-                        <View style={styles.videoInfo}>
-                          <Text style={styles.videoTitle} numberOfLines={2}>{card.video.title}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
+                <View style={[styles.allGrid, { paddingHorizontal: 16, gap: GRID_GAP }]}>
+                  {allCards.slice(0, allVisibleCount).map((story) => (
+                    <AudioCard
+                      key={story.id}
+                      story={story}
+                      onPress={() => { playStory(story); router.push("/audio/player"); }}
+                      isPlaying={currentStory?.id === story.id && isPlaying}
+                      style={{ width: gridCardWidth, marginRight: 0 }}
+                    />
+                  ))}
                 </View>
 
                 {allVisibleCount < allCards.length && (
                   <TouchableOpacity
                     onPress={() => setAllVisibleCount((c) => c + ALL_SECTION_PAGE_SIZE)}
                     activeOpacity={0.85}
-                    style={[styles.seeAllBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+                    style={[styles.seeAllBtn, { backgroundColor: colors.secondary, borderColor: colors.border, marginHorizontal: 16 }]}
                   >
                     <Text style={[styles.seeAllBtnText, { color: colors.primary }]}>सब देखी...</Text>
                     <Feather name="chevron-down" size={16} color={colors.primary} />
@@ -414,34 +358,10 @@ const styles = StyleSheet.create({
   videoTitle: { color: "#fff", fontSize: 13, fontWeight: "700", lineHeight: 18 },
   empty: { alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 16 },
   emptyText: { fontSize: 15, textAlign: "center", lineHeight: 24 },
-  allSectionTitle: { fontSize: 19, fontWeight: "900", letterSpacing: -0.3 },
-  allSectionSubtitle: { fontSize: 13, marginTop: 2, marginBottom: 14 },
   // Plain flexWrap grid (not a nested FlatList) so it naturally lays out
   // however many cards fit the screen width, and doesn't fight the outer
   // ScrollView for vertical scroll gestures.
   allGrid: { flexDirection: "row", flexWrap: "wrap" },
-  allGridItem: { marginBottom: 16 },
-  allVideoCard: {
-    width: 160,
-    aspectRatio: 1,
-    borderRadius: 16,
-    marginRight: 12,
-    marginBottom: 16,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  allVideoPlayBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   seeAllBtn: {
     flexDirection: "row",
     alignItems: "center",
