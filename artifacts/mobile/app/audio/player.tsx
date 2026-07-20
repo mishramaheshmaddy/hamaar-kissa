@@ -13,6 +13,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAudio, AudioStory } from "@/context/AudioContext";
@@ -78,6 +79,14 @@ function formatTotal(seconds: number): string {
 export default function AudioPlayerScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  // Computed (not a fixed %) so 2 columns always fit exactly regardless of
+  // screen width — a fixed percentage caused the same single-column
+  // fallback bug seen on the home screen's "सब" grid on narrower ~360dp
+  // Android devices.
+  const { width: windowWidth } = useWindowDimensions();
+  const RECO_GAP = 12;
+  const RECO_PADDING = 24;
+  const recoCardWidth = (windowWidth - RECO_PADDING * 2 - RECO_GAP) / 2;
   const router = useRouter();
   const {
     currentStory,
@@ -92,28 +101,50 @@ export default function AudioPlayerScreen() {
     savedStories,
     toggleLike,
     toggleSave,
+    playStory,
   } = useAudio();
   const { user } = useAuth();
   const [showSpeeds, setShowSpeeds] = useState(false);
   const { addDownload, removeDownload, isDownloaded } = useDownloads();
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [recommended, setRecommended] = useState<AudioStory[]>([]);
+  const [moreByNarrator, setMoreByNarrator] = useState<AudioStory[]>([]);
 
   useEffect(() => {
-    if (!currentStory?.categoryId) {
+    if (!currentStory) {
       setRecommended([]);
+      setMoreByNarrator([]);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const rows = await apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true");
-        if (cancelled) return;
-        const list = rows
-          .filter((s) => s.categoryId === currentStory.categoryId && String(s.id) !== currentStory.id)
-          .map(mapStory)
-          .slice(0, 10);
-        setRecommended(list);
+        const excludeId = `&excludeId=${currentStory.id}`;
+
+        // Same category — the primary recommendation row.
+        let categoryList: AudioStory[] = [];
+        if (currentStory.categoryId) {
+          const rows = await apiFetch<ApiAudioStory[]>(
+            `/api/audio-stories?published=true&categoryId=${currentStory.categoryId}${excludeId}`,
+          );
+          if (cancelled) return;
+          categoryList = rows.map(mapStory).slice(0, 10);
+        }
+        setRecommended(categoryList);
+
+        // Same narrator — a second row, since listeners often follow a
+        // voice they like more than a genre. Skipped if it would just
+        // duplicate the category row above.
+        let narratorList: AudioStory[] = [];
+        if (currentStory.narrator) {
+          const rows = await apiFetch<ApiAudioStory[]>(
+            `/api/audio-stories?published=true&narrator=${encodeURIComponent(currentStory.narrator)}${excludeId}`,
+          );
+          if (cancelled) return;
+          const categoryIds = new Set(categoryList.map((s) => s.id));
+          narratorList = rows.map(mapStory).filter((s) => !categoryIds.has(s.id)).slice(0, 10);
+        }
+        setMoreByNarrator(narratorList);
       } catch (err) {
         console.error("player recommendations fetch error:", err);
       }
@@ -121,7 +152,7 @@ export default function AudioPlayerScreen() {
     return () => {
       cancelled = true;
     };
-  }, [currentStory?.categoryId, currentStory?.id]);
+  }, [currentStory?.categoryId, currentStory?.narrator, currentStory?.id]);
 
   // Login check helper — mirrors AudioCard's requireLogin so Player and
   // Home/Category screens gate Like/Save/Download identically.
@@ -477,32 +508,29 @@ async function handleShare() {
             <Text style={styles.recoHeading}>
               {currentStory.categoryName ? `${currentStory.categoryName} से आउर सुनीं` : "आउर सुनीं"}
             </Text>
-            {recommended.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.recoRow}
-                activeOpacity={0.8}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  playStory(item);
-                }}
-              >
-                {item.thumbnail ? (
-                  <Image source={{ uri: item.thumbnail }} style={styles.recoThumb} contentFit="cover" />
-                ) : (
-                  <View style={[styles.recoThumb, styles.recoThumbFallback]}>
-                    <Text style={{ fontSize: 22 }}>{CATEGORY_ICONS[item.category] ?? "🎙️"}</Text>
-                  </View>
-                )}
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.recoTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.recoMeta} numberOfLines={1}>
-                    {item.narrator ? `${item.narrator} • ` : ""}{formatTotal(item.duration)}
-                  </Text>
-                </View>
-                <Feather name="play-circle" size={26} color="rgba(255,255,255,0.85)" />
-              </TouchableOpacity>
-            ))}
+            <View style={[styles.recoGrid, { gap: RECO_GAP }]}>
+              {recommended.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={{ width: recoCardWidth }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    playStory(item);
+                  }}
+                >
+                  {item.thumbnail ? (
+                    <Image source={{ uri: item.thumbnail }} style={styles.recoGridThumb} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.recoGridThumb, styles.recoThumbFallback]}>
+                      <Text style={{ fontSize: 28 }}>{CATEGORY_ICONS[item.category] ?? "🎙️"}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.recoGridTitle} numberOfLines={2}>{item.title}</Text>
+                  <Text style={styles.recoGridMeta} numberOfLines={1}>{formatTotal(item.duration)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {currentStory.categoryId && (
               <TouchableOpacity
@@ -515,41 +543,64 @@ async function handleShare() {
             )}
           </View>
         )}
+
+        {/* More from same narrator */}
+        {moreByNarrator.length > 0 && (
+          <View style={styles.recoSection}>
+            <Text style={styles.recoHeading}>{currentStory.narrator} के आउर कहानी</Text>
+            <View style={[styles.recoGrid, { gap: RECO_GAP }]}>
+              {moreByNarrator.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={{ width: recoCardWidth }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    playStory(item);
+                  }}
+                >
+                  {item.thumbnail ? (
+                    <Image source={{ uri: item.thumbnail }} style={styles.recoGridThumb} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.recoGridThumb, styles.recoThumbFallback]}>
+                      <Text style={{ fontSize: 28 }}>{CATEGORY_ICONS[item.category] ?? "🎙️"}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.recoGridTitle} numberOfLines={2}>{item.title}</Text>
+                  <Text style={styles.recoGridMeta} numberOfLines={1}>{formatTotal(item.duration)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  recoSection: { width: "100%", marginTop: 40 },
+  recoSection: { width: "100%", marginTop: 32 },
   recoHeading: {
     color: "#fff",
     fontSize: 17,
     fontWeight: "800",
     marginBottom: 14,
   },
-  recoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 14,
-    padding: 8,
-  },
-  recoThumb: { width: 52, height: 52, borderRadius: 10 },
+  recoGrid: { flexDirection: "row", flexWrap: "wrap" },
+  recoGridThumb: { width: "100%", aspectRatio: 1, borderRadius: 12, marginBottom: 6 },
   recoThumbFallback: {
     backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
-  recoTitle: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  recoMeta: { color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 2 },
+  recoGridTitle: { color: "#fff", fontSize: 13, fontWeight: "700", lineHeight: 17 },
+  recoGridMeta: { color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 2 },
   recoMoreBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    marginTop: 8,
+    marginTop: 16,
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,

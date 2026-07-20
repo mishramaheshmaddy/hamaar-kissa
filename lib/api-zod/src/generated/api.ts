@@ -116,6 +116,9 @@ export const DeleteCategoryParams = zod.object({
 export const ListAudioStoriesQueryParams = zod.object({
   category: zod.coerce.string().optional(),
   published: zod.coerce.boolean().optional(),
+  categoryId: zod.coerce.number().optional(),
+  narrator: zod.coerce.string().optional(),
+  excludeId: zod.coerce.number().optional(),
 });
 
 export const ListAudioStoriesResponseItem = zod.object({

@@ -9,8 +9,33 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { apiFetch } from "@/lib/api";
-import { useAudio } from "@/context/AudioContext";
+import { apiFetch, ApiAudioStory, BASE } from "@/lib/api";
+import { useAudio, AudioStory } from "@/context/AudioContext";
+
+// Same mapping pattern used everywhere else in the app (home, category,
+// audio tab) — without it, playing from Search was handing the player a
+// raw API object with the wrong field names (thumbnailUrl instead of
+// thumbnail, durationSeconds instead of duration, etc), so the mini
+// player/full player silently showed a blank thumbnail and broken
+// duration for anything played from search.
+function mapStory(s: ApiAudioStory): AudioStory {
+  return {
+    id: String(s.id),
+    title: s.title,
+    category: s.categoryName || "other",
+    categoryId: s.categoryId ?? undefined,
+    categoryName: s.categoryName ?? undefined,
+    duration: s.durationSeconds,
+    thumbnail: s.thumbnailUrl
+      ? (s.thumbnailUrl.startsWith("/") ? `${BASE}${s.thumbnailUrl}` : s.thumbnailUrl)
+      : "",
+    narrator: s.narrator,
+    description: s.description,
+    audioUrl: s.audioUrl
+      ? (s.audioUrl.startsWith("/") ? `${BASE}${s.audioUrl}` : s.audioUrl)
+      : "",
+  };
+}
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -110,7 +135,7 @@ export default function SearchScreen() {
           <TouchableOpacity
             onPress={() => {
               if (tab === "audio") {
-                playStory(item);
+                playStory(mapStory(item as ApiAudioStory));
                 router.back();
               } else {
                 router.push(

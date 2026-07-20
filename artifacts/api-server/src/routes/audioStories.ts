@@ -24,13 +24,12 @@ router.get("/audio-stories", async (req, res) => {
     .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
     .orderBy(audioStoriesTable.sortOrder, audioStoriesTable.id);
 
+  const q = query.success ? query.data : undefined;
   const filtered = rows.filter((r) => {
-    if (query.success && query.data.category) {
-      return r.story.categoryId !== null;
-    }
-    if (query.success && query.data.published !== undefined) {
-      return r.story.published === query.data.published;
-    }
+    if (q?.published !== undefined && r.story.published !== q.published) return false;
+    if (q?.categoryId !== undefined && r.story.categoryId !== q.categoryId) return false;
+    if (q?.narrator && r.story.narrator !== q.narrator) return false;
+    if (q?.excludeId !== undefined && r.story.id === q.excludeId) return false;
     return true;
   });
 

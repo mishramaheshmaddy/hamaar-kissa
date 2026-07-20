@@ -134,6 +134,18 @@ paths:
           name: published
           schema:
             type: boolean
+        - in: query
+          name: categoryId
+          schema:
+            type: integer
+        - in: query
+          name: narrator
+          schema:
+            type: string
+        - in: query
+          name: excludeId
+          schema:
+            type: integer
       responses:
         "200":
           description: OK

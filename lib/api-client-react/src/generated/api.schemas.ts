@@ -205,6 +205,9 @@ export type ListCategoriesParams = {
 export type ListAudioStoriesParams = {
   category?: string;
   published?: boolean;
+  categoryId?: number;
+  narrator?: string;
+  excludeId?: number;
 };
 
 export type ListVideosParams = {
