@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 import {
   NOTIFICATION_PREF_KEY,
   registerForPushNotifications,
@@ -31,6 +32,7 @@ export default function NotificationsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
   const [master, setMaster] = useState(true);
@@ -57,6 +59,7 @@ export default function NotificationsScreen() {
         master: newMaster,
         notifyNewStories: newPrefs.new_stories ?? true,
         notifyNewVideos: newPrefs.new_videos ?? true,
+        phone: user?.phone ?? null,
       });
     } else {
       unregisterPushNotifications();

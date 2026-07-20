@@ -9,9 +9,10 @@ const router = Router();
 // which already works without login.
 router.post("/push-tokens", async (req, res) => {
   try {
-    const { token, platform, notifyNewStories, notifyNewVideos } = req.body as {
+    const { token, platform, phone, notifyNewStories, notifyNewVideos } = req.body as {
       token?: string;
       platform?: string;
+      phone?: string | null;
       notifyNewStories?: boolean;
       notifyNewVideos?: boolean;
     };
@@ -26,6 +27,7 @@ router.post("/push-tokens", async (req, res) => {
         .update(pushTokensTable)
         .set({
           platform: platform ?? existing[0].platform,
+          phone: phone !== undefined ? phone : existing[0].phone,
           notifyNewStories: notifyNewStories ?? existing[0].notifyNewStories,
           notifyNewVideos: notifyNewVideos ?? existing[0].notifyNewVideos,
         })
@@ -34,6 +36,7 @@ router.post("/push-tokens", async (req, res) => {
       await db.insert(pushTokensTable).values({
         token,
         platform: platform ?? "android",
+        phone: phone ?? null,
         notifyNewStories: notifyNewStories ?? true,
         notifyNewVideos: notifyNewVideos ?? true,
       });

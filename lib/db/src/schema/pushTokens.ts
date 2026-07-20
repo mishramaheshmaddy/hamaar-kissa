@@ -10,6 +10,11 @@ export const pushTokensTable = pgTable("push_tokens", {
   id: serial("id").primaryKey(),
   token: text("token").notNull().unique(),
   platform: text("platform").notNull().default("android"),
+  // The logged-in user's phone (E.164, e.g. +919876543210) at the time this
+  // token was last (re)registered — lets the CMS target a notification at
+  // specific phone numbers instead of everyone. Null for guests/logged-out
+  // devices, which can still receive daily-cycle/broadcast-to-everyone sends.
+  phone: text("phone"),
   notifyNewStories: boolean("notify_new_stories").notNull().default(true),
   notifyNewVideos: boolean("notify_new_videos").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

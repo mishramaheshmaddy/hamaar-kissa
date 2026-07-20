@@ -6,7 +6,7 @@ import {
   scheduledNotificationsTable,
   pushTokensTable,
 } from "@workspace/db";
-import { sendPushToTokens } from "./push";
+import { sendPushToTokens, resolveTokensForPhones } from "./push";
 import { logger } from "./logger";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
@@ -66,10 +66,17 @@ async function runScheduledCheck() {
 
   for (const item of due) {
     try {
-      const tokens = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
+      let tokens: string[];
+      if (item.targetPhones) {
+        const phones: string[] = JSON.parse(item.targetPhones);
+        tokens = (await resolveTokensForPhones(phones)).tokens;
+      } else {
+        const rows = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
+        tokens = rows.map((r) => r.token);
+      }
       if (tokens.length > 0) {
         await sendPushToTokens(
-          tokens.map((t) => t.token),
+          tokens,
           item.title,
           item.body,
           buildDeepLinkData(item.contentType, item.contentId),

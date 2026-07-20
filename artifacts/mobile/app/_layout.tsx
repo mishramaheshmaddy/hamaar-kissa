@@ -16,7 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AudioProvider } from "@/context/AudioContext";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Platform } from "react-native";
 import {
   loadStoredNotificationPrefs,
@@ -30,11 +30,15 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const router = useRouter();
+  const { user } = useAuth();
 
   // Silently registers this device for push notifications on every app
-  // start (respecting whatever the user last set in Settings → सूचना,
-  // defaulting to on), and wires up tap-to-open deep linking so tapping a
-  // notification jumps straight to that story/video.
+  // start AND whenever login state changes (respecting whatever the user
+  // last set in Settings → सूचना, defaulting to on). Re-running this on
+  // user?.phone changes is what lets the CMS target a notification at a
+  // specific phone number — the token gets tagged with whoever is
+  // currently logged in on this device. Also wires up tap-to-open deep
+  // linking so tapping a notification jumps straight to that story/video.
   useEffect(() => {
     if (Platform.OS === "web") return;
 
@@ -45,10 +49,14 @@ function RootLayoutNav() {
           master: stored.master,
           notifyNewStories: stored.prefs.new_stories,
           notifyNewVideos: stored.prefs.new_videos,
+          phone: user?.phone ?? null,
         });
       }
     })();
+  }, [user?.phone]);
 
+  useEffect(() => {
+    if (Platform.OS === "web") return;
     const unsubscribe = setupNotificationOpenHandler((type, id) => {
       router.push(`/content/${type}/${id}` as any);
     });

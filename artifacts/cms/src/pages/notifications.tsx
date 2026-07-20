@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { useListAudioStories, useListVideos } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Loader2, Send, Clock, X, RefreshCcw } from "lucide-react";
+import { Bell, Loader2, Send, Clock, X, RefreshCcw, Search, Check, Upload, Users, Phone } from "lucide-react";
 
 interface Settings {
   id: number;
@@ -34,14 +35,18 @@ interface ScheduledItem {
   body: string;
   contentType: string | null;
   contentId: number | null;
+  targetPhones: string | null;
   scheduledAt: string;
   status: "pending" | "sent" | "cancelled" | "failed";
   sentAt: string | null;
 }
 
-// Shared "attach content" picker — a type select (none/audio/video) plus a
-// second select listing that type's published titles. Used by both the
-// daily-cycle dialog and the manual notification card.
+// Shared "attach content" picker: type select (none/audio/video), then a
+// search box + scrollable checklist of that type's titles — sorted newest
+// first — instead of a plain dropdown. Meant for a large library (hundreds
+// of files) where scrolling a dropdown isn't practical. Only one item can
+// be attached (a notification deep-links to a single piece of content),
+// so the "checkbox" is really a single-select highlight.
 function ContentPicker({
   contentType,
   contentId,
@@ -53,46 +58,211 @@ function ContentPicker({
 }) {
   const { data: stories } = useListAudioStories();
   const { data: videos } = useListVideos();
+  const [query, setQuery] = useState("");
 
-  const items =
-    contentType === "audio" ? (stories ?? []) : contentType === "video" ? (videos ?? []) : [];
+  const items = useMemo(() => {
+    const source: any[] = contentType === "audio" ? (stories ?? []) : contentType === "video" ? (videos ?? []) : [];
+    const sorted = [...source].sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : a.id;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : b.id;
+      return tb - ta; // newest first
+    });
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((item) => item.title?.toLowerCase().includes(q));
+  }, [contentType, stories, videos, query]);
+
+  const selected = items.find((i) => i.id === contentId);
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="space-y-2">
-        <Label>Attach content (optional)</Label>
-        <Select
-          value={contentType ?? "none"}
-          onValueChange={(v) => onChange(v === "none" ? null : v, null)}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">कुछ नइखे (no content)</SelectItem>
-            <SelectItem value="audio">Audio Story</SelectItem>
-            <SelectItem value="video">Video</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-2">
+      <Label>Attach content (optional)</Label>
+      <Select
+        value={contentType ?? "none"}
+        onValueChange={(v) => { onChange(v === "none" ? null : v, null); setQuery(""); }}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">कुछ नइखे (no content)</SelectItem>
+          <SelectItem value="audio">Audio Story</SelectItem>
+          <SelectItem value="video">Video</SelectItem>
+        </SelectContent>
+      </Select>
+
       {contentType && (
         <div className="space-y-2">
-          <Label>Which one</Label>
-          <Select
-            value={contentId ? String(contentId) : undefined}
-            onValueChange={(v) => onChange(contentType, Number(v))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select..." />
-            </SelectTrigger>
-            <SelectContent>
-              {items.map((item: any) => (
-                <SelectItem key={item.id} value={String(item.id)}>
-                  {item.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              className="pl-8 h-9 text-sm"
+              placeholder="नाम लिखीं खोजे खातिर..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          {selected && (
+            <p className="text-xs text-muted-foreground">चुनल गइल बा: <span className="font-medium text-foreground">{selected.title}</span></p>
+          )}
+          <div className="border rounded-lg max-h-48 overflow-y-auto divide-y">
+            {items.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-3">कुछु नइखे मिलल</p>
+            ) : (
+              items.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => onChange(contentType, item.id === contentId ? null : item.id)}
+                  className="w-full flex items-center gap-2 p-2 text-left text-sm hover:bg-muted/50 transition-colors"
+                >
+                  <span
+                    className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
+                      item.id === contentId ? "bg-primary border-primary" : "border-muted-foreground/40"
+                    }`}
+                  >
+                    {item.id === contentId && <Check className="w-3 h-3 text-primary-foreground" />}
+                  </span>
+                  <span className="truncate">{item.title}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// "Everyone" vs "specific phone numbers" — a single number typed in, plus
+// bulk-uploading a sheet (xlsx/csv) with a phone-number column, matching
+// against whichever number is currently logged in on each device.
+function AudienceTarget({
+  phones,
+  onChange,
+}: {
+  phones: string[];
+  onChange: (phones: string[]) => void;
+}) {
+  const [mode, setMode] = useState<"everyone" | "specific">(phones.length > 0 ? "specific" : "everyone");
+  const [phoneInput, setPhoneInput] = useState("");
+  const { toast } = useToast();
+
+  const setEveryone = () => {
+    setMode("everyone");
+    onChange([]);
+  };
+
+  const addPhone = () => {
+    const v = phoneInput.trim();
+    if (!v) return;
+    if (!phones.includes(v)) onChange([...phones, v]);
+    setPhoneInput("");
+  };
+
+  const removePhone = (p: string) => onChange(phones.filter((x) => x !== p));
+
+  const handleSheetUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        const found: string[] = [];
+        for (const row of rows) {
+          for (const key of Object.keys(row)) {
+            const val = String(row[key]).trim();
+            // Pick up any cell that looks like a phone number, regardless
+            // of the column header text (sheets vary: "Mobile number",
+            // "Phone", "नंबर", etc).
+            if (val.replace(/\D/g, "").length >= 10) {
+              found.push(val);
+              break;
+            }
+          }
+        }
+        if (found.length === 0) {
+          toast({ title: "शीट में कवनो नंबर नइखे मिलल", variant: "destructive" });
+          return;
+        }
+        const merged = Array.from(new Set([...phones, ...found]));
+        onChange(merged);
+        toast({ title: `${found.length} नंबर जोड़ल गइल` });
+      } catch {
+        toast({ title: "शीट पढ़ल नइखे भइल", variant: "destructive" });
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = "";
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label>किके भेजल जाई</Label>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={mode === "everyone" ? "default" : "outline"}
+          size="sm"
+          onClick={setEveryone}
+          className="gap-2"
+        >
+          <Users className="w-3.5 h-3.5" />
+          सबके (Everyone)
+        </Button>
+        <Button
+          type="button"
+          variant={mode === "specific" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMode("specific")}
+          className="gap-2"
+        >
+          <Phone className="w-3.5 h-3.5" />
+          खास नंबर पर
+        </Button>
+      </div>
+
+      {mode === "specific" && (
+        <div className="space-y-3 rounded-lg border p-3">
+          <div className="flex gap-2">
+            <Input
+              placeholder="मोबाइल नंबर डालीं, जइसे 9876543210"
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPhone(); } }}
+            />
+            <Button type="button" variant="outline" onClick={addPhone}>Add</Button>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-primary cursor-pointer w-fit">
+            <Upload className="w-3.5 h-3.5" />
+            शीट अपलोड करीं (.xlsx / .csv)
+            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleSheetUpload} />
+          </label>
+
+          {phones.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">{phones.length} नंबर चुनल गइल</p>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                {phones.map((p) => (
+                  <span key={p} className="inline-flex items-center gap-1 bg-muted text-xs rounded-full px-2.5 py-1">
+                    {p}
+                    <button type="button" onClick={() => removePhone(p)}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => onChange([])} className="text-xs h-6 px-2">
+                सब हटाईं
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -212,6 +382,7 @@ export default function Notifications() {
   const [body, setBody] = useState("");
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentId, setContentId] = useState<number | null>(null);
+  const [targetPhones, setTargetPhones] = useState<string[]>([]);
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
@@ -243,6 +414,7 @@ export default function Notifications() {
     setBody("");
     setContentType(null);
     setContentId(null);
+    setTargetPhones([]);
     setScheduleOn(false);
     setScheduleDate("");
     setScheduleTime("");
@@ -256,11 +428,18 @@ export default function Notifications() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), contentType, contentId }),
+        body: JSON.stringify({
+          title: title.trim(),
+          body: body.trim(),
+          contentType,
+          contentId,
+          phones: targetPhones.length > 0 ? targetPhones : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to send");
-      toast({ title: `भेज दिहल गइल — ${data.recipients} device` });
+      const unmatchedNote = data.unmatched?.length ? ` — ${data.unmatched.length} नंबर के app नइखे मिलल` : "";
+      toast({ title: `भेज दिहल गइल — ${data.recipients} device${unmatchedNote}` });
       resetManualForm();
       loadHistory();
     } catch (e) {
@@ -279,7 +458,14 @@ export default function Notifications() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), contentType, contentId, scheduledAt }),
+        body: JSON.stringify({
+          title: title.trim(),
+          body: body.trim(),
+          contentType,
+          contentId,
+          scheduledAt,
+          phones: targetPhones.length > 0 ? targetPhones : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to schedule");
@@ -376,6 +562,8 @@ export default function Notifications() {
             onChange={(t, id) => { setContentType(t); setContentId(id); }}
           />
 
+          <AudienceTarget phones={targetPhones} onChange={setTargetPhones} />
+
           <div className="flex items-center justify-between rounded-lg border p-3">
             <div>
               <p className="text-sm font-medium">बाद में शेड्यूल करीं</p>
@@ -426,25 +614,29 @@ export default function Notifications() {
             <p className="text-sm text-muted-foreground">अबहीं तक कवनो notification नइखे भेजल गइल।</p>
           ) : (
             <div className="divide-y">
-              {history.map((item) => (
-                <div key={item.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{item.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.body}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {item.status === "sent" && `भेजल गइल — ${new Date(item.sentAt!).toLocaleString()}`}
-                      {item.status === "pending" && `शेड्यूल्ड — ${new Date(item.scheduledAt).toLocaleString()}`}
-                      {item.status === "cancelled" && "रद्द कर दिहल गइल"}
-                      {item.status === "failed" && "फेल भइल"}
-                    </p>
+              {history.map((item) => {
+                const phoneCount = item.targetPhones ? (JSON.parse(item.targetPhones) as string[]).length : 0;
+                return (
+                  <div key={item.id} className="py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{item.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{item.body}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {item.status === "sent" && `भेजल गइल — ${new Date(item.sentAt!).toLocaleString()}`}
+                        {item.status === "pending" && `शेड्यूल्ड — ${new Date(item.scheduledAt).toLocaleString()}`}
+                        {item.status === "cancelled" && "रद्द कर दिहल गइल"}
+                        {item.status === "failed" && "फेल भइल"}
+                        {phoneCount > 0 && ` • ${phoneCount} खास नंबर पर`}
+                      </p>
+                    </div>
+                    {item.status === "pending" && (
+                      <Button variant="ghost" size="icon" onClick={() => cancelScheduled(item.id)}>
+                        <X className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                  {item.status === "pending" && (
-                    <Button variant="ghost" size="icon" onClick={() => cancelScheduled(item.id)}>
-                      <X className="w-4 h-4 text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

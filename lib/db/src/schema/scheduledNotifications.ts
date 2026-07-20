@@ -10,6 +10,9 @@ export const scheduledNotificationsTable = pgTable("scheduled_notifications", {
   body: text("body").notNull(),
   contentType: text("content_type"), // "audio" | "video" | null
   contentId: integer("content_id"),
+  // JSON-stringified array of E.164 phone numbers, e.g. '["+919876543210"]'.
+  // Null/empty means "everyone" (all registered devices), same as before.
+  targetPhones: text("target_phones"),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("pending"), // pending | sent | cancelled | failed
   sentAt: timestamp("sent_at", { withTimezone: true }),

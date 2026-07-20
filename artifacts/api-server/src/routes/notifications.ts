@@ -7,7 +7,7 @@ import {
   scheduledNotificationsTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
-import { sendPushToTokens } from "../lib/push";
+import { sendPushToTokens, resolveTokensForPhones } from "../lib/push";
 
 const router = Router();
 
@@ -102,20 +102,33 @@ router.get("/admin/notifications/scheduled", requireAdmin, async (_req, res) => 
 // it shows up alongside scheduled ones in the CMS history list.
 router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => {
   try {
-    const { title, body, contentType, contentId } = req.body as {
+    const { title, body, contentType, contentId, phones } = req.body as {
       title?: string;
       body?: string;
       contentType?: string | null;
       contentId?: number | null;
+      phones?: string[];
     };
     if (!title?.trim() || !body?.trim()) {
       res.status(400).json({ error: "title and body are required" });
       return;
     }
 
-    const rows = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
-    const result = rows.length
-      ? await sendPushToTokens(rows.map((r) => r.token), title.trim(), body.trim(), buildDeepLinkData(contentType, contentId))
+    let tokens: string[];
+    let matched: string[] = [];
+    let unmatched: string[] = [];
+    if (phones && phones.length > 0) {
+      const resolved = await resolveTokensForPhones(phones);
+      tokens = resolved.tokens;
+      matched = resolved.matched;
+      unmatched = resolved.unmatched;
+    } else {
+      const rows = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
+      tokens = rows.map((r) => r.token);
+    }
+
+    const result = tokens.length
+      ? await sendPushToTokens(tokens, title.trim(), body.trim(), buildDeepLinkData(contentType, contentId))
       : { sent: 0, failed: 0 };
 
     const [record] = await db
@@ -125,13 +138,14 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => 
         body: body.trim(),
         contentType: contentType ?? null,
         contentId: contentId ?? null,
+        targetPhones: phones && phones.length > 0 ? JSON.stringify(phones) : null,
         scheduledAt: new Date(),
         status: "sent",
         sentAt: new Date(),
       })
       .returning();
 
-    res.json({ ok: true, recipients: rows.length, ...result, record });
+    res.json({ ok: true, recipients: tokens.length, matched, unmatched, ...result, record });
   } catch (e) {
     console.error("POST /admin/notifications/broadcast error:", e);
     res.status(500).json({ error: "Failed to send broadcast" });
@@ -142,12 +156,13 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => 
 // (checks every 5 min) will send it once scheduledAt has passed.
 router.post("/admin/notifications/scheduled", requireAdmin, async (req, res) => {
   try {
-    const { title, body, contentType, contentId, scheduledAt } = req.body as {
+    const { title, body, contentType, contentId, scheduledAt, phones } = req.body as {
       title?: string;
       body?: string;
       contentType?: string | null;
       contentId?: number | null;
       scheduledAt?: string;
+      phones?: string[];
     };
     if (!title?.trim() || !body?.trim() || !scheduledAt) {
       res.status(400).json({ error: "title, body, and scheduledAt are required" });
@@ -166,6 +181,7 @@ router.post("/admin/notifications/scheduled", requireAdmin, async (req, res) => 
         body: body.trim(),
         contentType: contentType ?? null,
         contentId: contentId ?? null,
+        targetPhones: phones && phones.length > 0 ? JSON.stringify(phones) : null,
         scheduledAt: when,
         status: "pending",
       })

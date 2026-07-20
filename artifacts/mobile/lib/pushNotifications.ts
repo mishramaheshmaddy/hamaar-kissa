@@ -7,6 +7,10 @@ export interface NotificationPrefs {
   master: boolean;
   notifyNewStories: boolean;
   notifyNewVideos: boolean;
+  // The logged-in user's phone (E.164), if any — lets the CMS target
+  // notifications at specific phone numbers. Pass null/undefined for
+  // guests; the backend leaves the token's phone unset in that case.
+  phone?: string | null;
 }
 
 // Same storage key/shape as app/settings/notifications.tsx — kept here so
@@ -61,6 +65,7 @@ export async function registerForPushNotifications(prefs: NotificationPrefs): Pr
       body: JSON.stringify({
         token,
         platform: Platform.OS,
+        phone: prefs.phone ?? null,
         notifyNewStories: prefs.notifyNewStories,
         notifyNewVideos: prefs.notifyNewVideos,
       }),
