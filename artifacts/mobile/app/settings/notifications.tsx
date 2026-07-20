@@ -13,8 +13,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import {
+  NOTIFICATION_PREF_KEY,
+  registerForPushNotifications,
+  unregisterPushNotifications,
+} from "@/lib/pushNotifications";
 
-const PREF_KEY = "pref_notifications";
+const PREF_KEY = NOTIFICATION_PREF_KEY;
 
 const NOTIFICATION_TYPES = [
   { key: "new_stories", label: "नई कहानी", desc: "जब नई कहानी जोड़ी जाए" },
@@ -47,6 +52,15 @@ export default function NotificationsScreen() {
 
   const save = (newMaster: boolean, newPrefs: Record<string, boolean>) => {
     AsyncStorage.setItem(PREF_KEY, JSON.stringify({ master: newMaster, prefs: newPrefs })).catch(() => {});
+    if (newMaster) {
+      registerForPushNotifications({
+        master: newMaster,
+        notifyNewStories: newPrefs.new_stories ?? true,
+        notifyNewVideos: newPrefs.new_videos ?? true,
+      });
+    } else {
+      unregisterPushNotifications();
+    }
   };
 
   const toggleMaster = (val: boolean) => {

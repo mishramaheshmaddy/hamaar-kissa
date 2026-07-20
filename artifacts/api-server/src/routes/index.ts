@@ -13,6 +13,8 @@ import userSubmissionsRouter from "./userSubmissions";
 import shareRouter from "./share";
 import firebaseAuthRouter from "./firebaseAuth";
 import searchRouter from "./search";
+import pushTokensRouter from "./pushTokens";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -30,5 +32,7 @@ router.use(userSubmissionsRouter);
 router.use(shareRouter);
 router.use(firebaseAuthRouter);
 router.use(searchRouter);
+router.use(pushTokensRouter);
+router.use(notificationsRouter);
 
 export default router;

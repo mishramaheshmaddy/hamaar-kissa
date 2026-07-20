@@ -7,7 +7,7 @@ import {
 } from "@expo-google-fonts/poppins";
 import { Feather } from "@expo/vector-icons";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -18,12 +18,43 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AudioProvider } from "@/context/AudioContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Platform } from "react-native";
+import {
+  loadStoredNotificationPrefs,
+  registerForPushNotifications,
+  setupNotificationOpenHandler,
+} from "@/lib/pushNotifications";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const router = useRouter();
+
+  // Silently registers this device for push notifications on every app
+  // start (respecting whatever the user last set in Settings → सूचना,
+  // defaulting to on), and wires up tap-to-open deep linking so tapping a
+  // notification jumps straight to that story/video.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    (async () => {
+      const stored = await loadStoredNotificationPrefs();
+      if (stored.master) {
+        registerForPushNotifications({
+          master: stored.master,
+          notifyNewStories: stored.prefs.new_stories,
+          notifyNewVideos: stored.prefs.new_videos,
+        });
+      }
+    })();
+
+    const unsubscribe = setupNotificationOpenHandler((type, id) => {
+      router.push(`/content/${type}/${id}` as any);
+    });
+    return unsubscribe;
+  }, []);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

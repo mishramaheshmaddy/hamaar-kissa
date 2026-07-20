@@ -1,4 +1,4 @@
-import { LayoutDashboard, Library, Music, Video as VideoIcon, LogOut, LayoutGrid, Users as UsersIcon, UploadCloud } from "lucide-react";
+import { LayoutDashboard, Library, Music, Video as VideoIcon, LogOut, LayoutGrid, Users as UsersIcon, UploadCloud, Bell } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/videos", label: "Videos", icon: VideoIcon },
     { href: "/bulk-upload", label: "Bulk Upload", icon: UploadCloud },
     { href: "/user-submissions", label: "User Submissions", icon: UsersIcon },
+    { href: "/notifications", label: "Notifications", icon: Bell },
   ];
 
   return (
