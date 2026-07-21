@@ -135,6 +135,7 @@ export const ListAudioStoriesResponseItem = zod.object({
   searchTags: zod.string(),
   published: zod.boolean(),
   sortOrder: zod.number(),
+  homeSectionId: zod.number().nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -155,6 +156,7 @@ export const CreateAudioStoryBody = zod.object({
   searchTags: zod.string().optional(),
   published: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
+  homeSectionId: zod.number().nullish(),
 });
 
 /**
@@ -178,6 +180,7 @@ export const GetAudioStoryResponse = zod.object({
   searchTags: zod.string(),
   published: zod.boolean(),
   sortOrder: zod.number(),
+  homeSectionId: zod.number().nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -201,6 +204,7 @@ export const UpdateAudioStoryBody = zod.object({
   searchTags: zod.string().optional(),
   published: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
+  homeSectionId: zod.number().nullish(),
 });
 
 export const UpdateAudioStoryResponse = zod.object({
@@ -217,6 +221,7 @@ export const UpdateAudioStoryResponse = zod.object({
   searchTags: zod.string(),
   published: zod.boolean(),
   sortOrder: zod.number(),
+  homeSectionId: zod.number().nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });

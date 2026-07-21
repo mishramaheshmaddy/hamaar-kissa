@@ -34,7 +34,7 @@ const schema = z.object({
   searchTags: z.string().optional(),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
-  homeSectionId: z.coerce.number().optional(),
+  homeSectionId: z.coerce.number().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -412,7 +412,7 @@ export default function AudioStoryForm() {
                   <FormItem>
                     <FormLabel>Home Section (Optional)</FormLabel>
                     <Select
-                      onValueChange={(val) => field.onChange(val === "none" ? undefined : parseInt(val))}
+                      onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                       value={field.value ? String(field.value) : "none"}
                     >
                       <FormControl>

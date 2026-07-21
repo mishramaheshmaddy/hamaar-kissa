@@ -557,6 +557,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        homeSectionId:
+          type: ["integer", "null"]
         createdAt:
           type: string
         updatedAt:
@@ -588,6 +590,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        homeSectionId:
+          type: ["integer", "null"]
 
     AudioStoryUpdate:
       type: object
@@ -614,6 +618,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        homeSectionId:
+          type: ["integer", "null"]
 
     Video:
       type: object

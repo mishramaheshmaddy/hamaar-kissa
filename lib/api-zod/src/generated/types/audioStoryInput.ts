@@ -19,4 +19,6 @@ export interface AudioStoryInput {
   searchTags?: string;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }

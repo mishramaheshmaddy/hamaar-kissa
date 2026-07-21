@@ -63,6 +63,8 @@ export interface AudioStory {
   searchTags: string;
   published: boolean;
   sortOrder: number;
+  /** @nullable */
+  homeSectionId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,6 +83,8 @@ export interface AudioStoryInput {
   searchTags?: string;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }
 
 export interface AudioStoryUpdate {
@@ -97,6 +101,8 @@ export interface AudioStoryUpdate {
   searchTags?: string;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }
 
 export interface Video {

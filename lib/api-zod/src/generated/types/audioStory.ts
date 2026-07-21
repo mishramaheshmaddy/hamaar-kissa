@@ -22,6 +22,8 @@ export interface AudioStory {
   searchTags: string;
   published: boolean;
   sortOrder: number;
+  /** @nullable */
+  homeSectionId: number | null;
   createdAt: string;
   updatedAt: string;
 }

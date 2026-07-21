@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, audioStoriesTable, categoriesTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
+import { syncHomeSectionAssignment } from "../lib/homeSectionSync";
 import {
   CreateAudioStoryBody,
   UpdateAudioStoryBody,
@@ -50,8 +51,9 @@ router.post("/audio-stories", requireAdmin, async (req, res) => {
     searchTags: body.searchTags ?? "",
     published: body.published ?? false,
     sortOrder: body.sortOrder ?? 0,
-    homeSectionId: (body as any).homeSectionId ?? null,
+    homeSectionId: body.homeSectionId ?? null,
   }).returning();
+  await syncHomeSectionAssignment("audio", row.id, row.homeSectionId);
   res.status(201).json(toDto(row, null));
 });
 
@@ -72,6 +74,12 @@ router.patch("/audio-stories/:id", requireAdmin, async (req, res) => {
   const updateData: Record<string, unknown> = { ...body, updatedAt: new Date() };
   const [row] = await db.update(audioStoriesTable).set(updateData).where(eq(audioStoriesTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  // Only reconcile home_section_items when the form actually sent this
+  // field — bulk-upload and other partial callers that never touch
+  // homeSectionId shouldn't accidentally wipe an existing assignment.
+  if ("homeSectionId" in body) {
+    await syncHomeSectionAssignment("audio", row.id, row.homeSectionId);
+  }
   res.json(toDto(row, null));
 });
 
