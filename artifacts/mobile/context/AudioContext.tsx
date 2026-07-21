@@ -65,6 +65,7 @@ interface AudioContextType {
   completedStories: number;
   listeningStreak: number;
   setSleepTimer: (minutes: number | null) => void;
+  clearUserLibrary: () => Promise<void>;
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
@@ -639,6 +640,27 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     [savedStories]
   );
 
+  // Called on sign-out so liked/saved/history (and derived listening
+  // stats) don't keep showing for whoever's no longer logged in, or leak
+  // into the next person who logs into the app on this device.
+  const clearUserLibrary = useCallback(async () => {
+    setLikedStories([]);
+    setSavedStories([]);
+    setHistory([]);
+    setListeningMinutes(0);
+    setCompletedStories(0);
+    setListeningStreak(0);
+    await AsyncStorage.multiRemove([
+      "liked_stories",
+      "saved_stories",
+      "history_stories",
+      "listening_minutes",
+      "completed_stories",
+      "listening_streak",
+      "last_listening_day",
+    ]).catch(() => {});
+  }, []);
+
   return (
     <AudioContext.Provider
       value={{
@@ -679,6 +701,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         completedStories,
         listeningStreak,
         setSleepTimer,
+        clearUserLibrary,
       }}
     >
       {children}

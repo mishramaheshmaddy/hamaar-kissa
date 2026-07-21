@@ -83,7 +83,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { savedStories, likedStories, history, playStory, currentStory, isPlaying, sleepTimerMinutes } = useAudio();
+  const { savedStories, likedStories, history, playStory, currentStory, isPlaying, sleepTimerMinutes, clearUserLibrary } = useAudio();
   const { user, token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"saved" | "liked" | "history" | "submissions">("saved");
   const [allStories, setAllStories] = useState<AudioStory[]>([]);
@@ -125,9 +125,15 @@ export default function ProfileScreen() {
     })();
   }, [token]);
 
-  const savedItems = allStories.filter((s) => savedStories.includes(s.id));
-  const likedItems = allStories.filter((s) => likedStories.includes(s.id));
-  const historyItems = allStories.filter((s) => history.includes(s.id));
+  // Guarded by `user` so any saved/liked/history data left over on the
+  // device from before a sign-out (or from an older app version) never
+  // displays while nobody is logged in.
+  const effectiveSaved = user ? savedStories : [];
+  const effectiveLiked = user ? likedStories : [];
+  const effectiveHistory = user ? history : [];
+  const savedItems = allStories.filter((s) => effectiveSaved.includes(s.id));
+  const likedItems = allStories.filter((s) => effectiveLiked.includes(s.id));
+  const historyItems = allStories.filter((s) => effectiveHistory.includes(s.id));
 
   const activeItems =
     activeTab === "saved" ? savedItems :
@@ -163,17 +169,17 @@ export default function ProfileScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{history.length}</Text>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>{effectiveHistory.length}</Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>सुनल</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{savedStories.length}</Text>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>{effectiveSaved.length}</Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>सेव</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{likedStories.length}</Text>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>{effectiveLiked.length}</Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>पसंद</Text>
             </View>
           </View>
@@ -326,29 +332,45 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <TouchableOpacity
-          style={[styles.logoutBtn, { borderColor: "#E74C3C" }]}
-          onPress={async () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Alert.alert(
-              "साइन आउट",
-              "का रउआ साइन आउट करे चाहत बानी?",
-              [
-                { text: "नाहीं", style: "cancel" },
-                {
-                  text: "हाँ, साइन आउट करीं",
-                  style: "destructive",
-                  onPress: async () => {
-                    await logout();
-                    router.replace("/(tabs)" as any);
+        {user ? (
+          <TouchableOpacity
+            style={[styles.logoutBtn, { borderColor: "#E74C3C" }]}
+            onPress={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              Alert.alert(
+                "साइन आउट",
+                "का रउआ साइन आउट करे चाहत बानी?",
+                [
+                  { text: "नाहीं", style: "cancel" },
+                  {
+                    text: "हाँ, साइन आउट करीं",
+                    style: "destructive",
+                    onPress: async () => {
+                      await logout();
+                      // Clears this device's saved/liked/history so it
+                      // doesn't keep showing (or leak into whoever logs
+                      // in next) after signing out.
+                      await clearUserLibrary();
+                      router.replace("/(tabs)" as any);
+                    },
                   },
-                },
-              ]
-            );
-          }}
-        >
-          <Text style={{ color: "#E74C3C", fontWeight: "700", fontSize: 15 }}>🚪 साइन आउट</Text>
-        </TouchableOpacity>
+                ]
+              );
+            }}
+          >
+            <Text style={{ color: "#E74C3C", fontWeight: "700", fontSize: 15 }}>🚪 साइन आउट</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.logoutBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push("/login" as any);
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>👋 साइन इन करीं</Text>
+          </TouchableOpacity>
+        )}
 
         <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
           Hamaar Kissa v1.0.0 • हमार भाषा, हमार कहनी
