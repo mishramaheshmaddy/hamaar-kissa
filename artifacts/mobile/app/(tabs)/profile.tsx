@@ -1,9 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ScrollView,
   Alert,
+  AppState,
+  AppStateStatus,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,7 +20,7 @@ import { useColors } from "@/hooks/useColors";
 import AudioCard from "@/components/AudioCard";
 import MiniPlayer from "@/components/MiniPlayer";
 import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 
 
@@ -94,24 +97,22 @@ export default function ProfileScreen() {
   const displayName = user ? (user.name || "") : "";
   const firstLetter = (displayName || user?.phone || "?").charAt(0).toUpperCase();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [rawStories, allCats] = await Promise.all([
-          apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-          apiFetch<ApiCategory[]>("/api/categories"),
-        ]);
-        const catMap: Record<number, string> = {};
-        for (const c of allCats) catMap[c.id] = c.name;
-        setAllStories(rawStories.map((s) => mapStory(s, catMap)));
-      } catch {}
-    })();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
+  const lastRefreshedAtRef = useRef<number>(0);
+  const STALE_AFTER_MS = 30_000;
 
-  useEffect(() => {
-    if (!token) return;
-    (async () => {
-      try {
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setRefreshing(true);
+    try {
+      const [rawStories, allCats] = await Promise.all([
+        apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
+        apiFetch<ApiCategory[]>("/api/categories"),
+      ]);
+      const catMap: Record<number, string> = {};
+      for (const c of allCats) catMap[c.id] = c.name;
+      setAllStories(rawStories.map((s) => mapStory(s, catMap)));
+
+      if (token) {
         const res = await fetch(`${BASE}/api/submissions/my`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -119,11 +120,40 @@ export default function ProfileScreen() {
           const data = await res.json();
           setMySubmissions(Array.isArray(data) ? data : data.submissions || []);
         }
-      } catch (err) {
-        console.error("fetch mySubmissions error:", err);
       }
-    })();
+      lastRefreshedAtRef.current = Date.now();
+    } catch (err) {
+      console.error("profile loadData error:", err);
+    } finally {
+      setRefreshing(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onPullToRefresh = useCallback(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    };
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    }, [loadData])
+  );
 
   // Guarded by `user` so any saved/liked/history data left over on the
   // device from before a sign-out (or from an older app version) never
@@ -142,7 +172,13 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 140 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onPullToRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+        }
+      >
 
         {/* Header */}
         <View style={[styles.profileHeader, { paddingTop: topPadding + 12, backgroundColor: colors.card }]}>

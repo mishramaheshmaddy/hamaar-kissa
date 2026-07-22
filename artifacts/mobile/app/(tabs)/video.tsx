@@ -1,10 +1,13 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useFocusEffect } from "expo-router";
 import { useAudio } from "@/context/AudioContext";
 import {
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
   Dimensions,
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -69,29 +72,57 @@ export default function VideoScreen() {
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : 0;
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [rawVideos, allCats] = await Promise.all([
-          apiFetch<ApiVideo[]>("/api/videos?published=true"),
-          apiFetch<ApiCategory[]>("/api/categories"),
-        ]);
-        if (cancelled) return;
+  const [refreshing, setRefreshing] = useState(false);
+  const lastRefreshedAtRef = useRef<number>(0);
+  const STALE_AFTER_MS = 30_000;
 
-        const videoCats = allCats.filter((c) => c.type === "video" || c.type === "both");
-        const catMap: Record<number, string> = {};
-        for (const c of allCats) catMap[c.id] = c.name;
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setRefreshing(true);
+    try {
+      const [rawVideos, allCats] = await Promise.all([
+        apiFetch<ApiVideo[]>("/api/videos?published=true"),
+        apiFetch<ApiCategory[]>("/api/categories"),
+      ]);
 
-        setCategories(videoCats);
-        setVideos(rawVideos.map((v) => mapVideo(v, v.categoryId ? (catMap[v.categoryId] ?? "other") : "other")));
-      } catch (_e) {
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+      const videoCats = allCats.filter((c) => c.type === "video" || c.type === "both");
+      const catMap: Record<number, string> = {};
+      for (const c of allCats) catMap[c.id] = c.name;
+
+      setCategories(videoCats);
+      setVideos(rawVideos.map((v) => mapVideo(v, v.categoryId ? (catMap[v.categoryId] ?? "other") : "other")));
+      lastRefreshedAtRef.current = Date.now();
+    } catch (_e) {
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onPullToRefresh = useCallback(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    };
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    }, [loadData])
+  );
 
   const filteredVideos = activeCategory === "all"
     ? videos
@@ -108,7 +139,8 @@ export default function VideoScreen() {
   useEffect(() => {
     setFeedItems(filteredVideos);
     setActiveIndex(0);
-  }, [activeCategory, videos.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategory, videos]);
 
   const appendRandomBatch = useCallback(() => {
     if (filteredVideos.length === 0) return;
@@ -190,6 +222,9 @@ export default function VideoScreen() {
           getItemLayout={(_, index) => ({ length: CARD_HEIGHT, offset: CARD_HEIGHT * index, index })}
           onEndReached={appendRandomBatch}
           onEndReachedThreshold={2}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onPullToRefresh} tintColor="#fff" colors={["#fff"]} />
+          }
           renderItem={({ item, index }) => (
             <VideoCard video={item} isActive={index === activeIndex} />
           )}

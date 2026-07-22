@@ -1,9 +1,12 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useRouter, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -52,29 +55,57 @@ export default function AudioScreen() {
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [rawStories, allCats] = await Promise.all([
-          apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-          apiFetch<ApiCategory[]>("/api/categories"),
-        ]);
-        if (cancelled) return;
+  const [refreshing, setRefreshing] = useState(false);
+  const lastRefreshedAtRef = useRef<number>(0);
+  const STALE_AFTER_MS = 30_000;
 
-        const audioCats = allCats.filter((c) => c.type === "audio" || c.type === "both");
-        const catMap: Record<number, string> = {};
-        for (const c of allCats) catMap[c.id] = c.name;
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setRefreshing(true);
+    try {
+      const [rawStories, allCats] = await Promise.all([
+        apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
+        apiFetch<ApiCategory[]>("/api/categories"),
+      ]);
 
-        setCategories(audioCats);
-        setStories(rawStories.map((s) => mapStory(s, s.categoryId ? (catMap[s.categoryId] ?? "other") : "other")));
-      } catch (_e) {
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+      const audioCats = allCats.filter((c) => c.type === "audio" || c.type === "both");
+      const catMap: Record<number, string> = {};
+      for (const c of allCats) catMap[c.id] = c.name;
+
+      setCategories(audioCats);
+      setStories(rawStories.map((s) => mapStory(s, s.categoryId ? (catMap[s.categoryId] ?? "other") : "other")));
+      lastRefreshedAtRef.current = Date.now();
+    } catch (_e) {
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onPullToRefresh = useCallback(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    };
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    }, [loadData])
+  );
 
   const filteredStories = stories.filter((s) => {
     if (activeTab === "saved") return savedStories.includes(s.id);
@@ -166,6 +197,9 @@ export default function AudioScreen() {
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onPullToRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="headphones" size={48} color={colors.mutedForeground} />

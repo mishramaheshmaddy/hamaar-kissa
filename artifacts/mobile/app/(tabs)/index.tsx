@@ -1,9 +1,12 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { useRouter, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
   FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -116,26 +119,71 @@ export default function HomeScreen() {
   const GRID_GAP = 12;
   const gridCardWidth = (windowWidth - 16 * 2 - GRID_GAP) / 2;
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [homeSections, allCats, audioStories] = await Promise.all([
-          apiFetch<HomeSectionItem[]>("/api/home-sections"),
-          apiFetch<ApiCategory[]>("/api/categories"),
-          apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-        ]);
-        if (cancelled) return;
-        setSections(homeSections);
-        setCategories(allCats);
-        setAllAudioRaw(audioStories);
-      } catch (_e) {
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const [refreshing, setRefreshing] = useState(false);
+  // Tracks when data was last (successfully) loaded, so we don't
+  // needlessly refetch on every single tab focus — only when it's been
+  // a while, matching the "stale after 30s" requirement.
+  const lastRefreshedAtRef = useRef<number>(0);
+  const STALE_AFTER_MS = 30_000;
+
+  const loadHomeData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setRefreshing(true);
+    try {
+      const [homeSections, allCats, audioStories] = await Promise.all([
+        apiFetch<HomeSectionItem[]>("/api/home-sections"),
+        apiFetch<ApiCategory[]>("/api/categories"),
+        apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
+      ]);
+      setSections(homeSections);
+      setCategories(allCats);
+      setAllAudioRaw(audioStories);
+      lastRefreshedAtRef.current = Date.now();
+    } catch (_e) {
+      // Keep whatever was already on screen rather than clearing it on a
+      // failed refresh — a blank home screen on a flaky connection is
+      // worse than slightly stale content.
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  // Initial load on mount.
+  useEffect(() => {
+    loadHomeData();
+  }, [loadHomeData]);
+
+  // Pull-to-refresh — always refetches immediately regardless of how
+  // recently the last refresh was, since this is an explicit user action.
+  const onPullToRefresh = useCallback(() => {
+    loadHomeData();
+  }, [loadHomeData]);
+
+  // Refresh when the app comes back from the background (e.g. user
+  // switched apps to check something, then returned) — same 30s
+  // staleness threshold as tab-focus, so briefly backgrounding the app
+  // (a notification swipe-down, etc.) doesn't trigger a refetch every time.
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadHomeData({ silent: true });
+      }
+    };
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [loadHomeData]);
+
+  // Refresh when returning to the Home tab, but only if it's been more
+  // than 30s since the last refresh — avoids refetching on every tab
+  // switch while still keeping content reasonably current.
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadHomeData({ silent: true });
+      }
+    }, [loadHomeData])
+  );
+
 
   const catMap = useMemo(() => {
     const m: Record<number, string> = {};
@@ -228,7 +276,18 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 140 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onPullToRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
         <View style={[styles.header, { paddingTop: topPadding + 12 }]}>
           <View style={styles.logoArea}>
             <Image source={logo} style={styles.logoImg} contentFit="contain" />

@@ -1,9 +1,12 @@
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  AppStateStatus,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -50,40 +53,66 @@ export default function CategoryDetailScreen() {
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+  const lastRefreshedAtRef = useRef<number>(0);
+  const STALE_AFTER_MS = 30_000;
+
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
     if (!id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [rawStories, allCats] = await Promise.all([
-          apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
-          apiFetch<ApiCategory[]>("/api/categories"),
-        ]);
-        if (cancelled) return;
+    if (!opts?.silent) setRefreshing(true);
+    try {
+      const [rawStories, allCats] = await Promise.all([
+        apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
+        apiFetch<ApiCategory[]>("/api/categories"),
+      ]);
 
-        const catMap: Record<number, string> = {};
-        for (const c of allCats) catMap[c.id] = c.name;
+      const catMap: Record<number, string> = {};
+      for (const c of allCats) catMap[c.id] = c.name;
 
-        const numId = Number(id);
-        const cat = allCats.find((c) => c.id === numId) ?? null;
-        setCategory(cat);
+      const numId = Number(id);
+      const cat = allCats.find((c) => c.id === numId) ?? null;
+      setCategory(cat);
 
-        // Audio-only: this screen is reached from "सब किसम" (all categories),
-        // and videos are intentionally excluded here — video content is only
-        // ever browsed via the Video tab's own category pills.
-        const filteredStories = rawStories
-          .filter((s) => s.categoryId === numId)
-          .map((s) => mapStory(s, catMap));
-        setStories(filteredStories);
-      } catch (_e) {
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      // Audio-only: this screen is reached from "सब किसम" (all categories),
+      // and videos are intentionally excluded here — video content is only
+      // ever browsed via the Video tab's own category pills.
+      const filteredStories = rawStories
+        .filter((s) => s.categoryId === numId)
+        .map((s) => mapStory(s, catMap));
+      setStories(filteredStories);
+      lastRefreshedAtRef.current = Date.now();
+    } catch (_e) {
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onPullToRefresh = useCallback(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === "active" && Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    };
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Date.now() - lastRefreshedAtRef.current > STALE_AFTER_MS) {
+        loadData({ silent: true });
+      }
+    }, [loadData])
+  );
 
   const gradient: [string, string] =
     category ? (CATEGORY_GRADIENTS[category.name] ?? ["#E8530A", "#BF360C"]) : ["#E8530A", "#BF360C"];
@@ -109,30 +138,17 @@ export default function CategoryDetailScreen() {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : totalCount === 0 ? (
-        <View style={styles.center}>
-          <Text style={{ fontSize: 52 }}>🎙️</Text>
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-            कवनो सामग्री नइखे
-          </Text>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            CMS से इस किसिम में कहानी जोड़ीं
-          </Text>
-          <TouchableOpacity
-            style={[styles.backBtnPill, { backgroundColor: colors.primary }]}
-            onPress={() => router.back()}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>वापस जाईं</Text>
-          </TouchableOpacity>
-        </View>
       ) : (
         <FlatList
           data={stories}
           keyExtractor={(item) => `story-${item.id}`}
           numColumns={2}
           columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={totalCount === 0 ? { flexGrow: 1 } : styles.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onPullToRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+          }
           renderItem={({ item }) => (
             <View style={styles.cardWrapper}>
               <AudioCard
@@ -146,10 +162,20 @@ export default function CategoryDetailScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                कवनो कहानी नइखे
+            <View style={styles.center}>
+              <Text style={{ fontSize: 52 }}>🎙️</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                कवनो सामग्री नइखे
               </Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                CMS से इस किसिम में कहानी जोड़ीं
+              </Text>
+              <TouchableOpacity
+                style={[styles.backBtnPill, { backgroundColor: colors.primary }]}
+                onPress={() => router.back()}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>वापस जाईं</Text>
+              </TouchableOpacity>
             </View>
           }
         />
