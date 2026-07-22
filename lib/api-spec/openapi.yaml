@@ -651,6 +651,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        homeSectionId:
+          type: ["integer", "null"]
         createdAt:
           type: string
         updatedAt:
@@ -682,6 +684,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        homeSectionId:
+          type: ["integer", "null"]
 
     VideoUpdate:
       type: object
@@ -708,6 +712,8 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        homeSectionId:
+          type: ["integer", "null"]
 
     YoutubeInfoRequest:
       type: object

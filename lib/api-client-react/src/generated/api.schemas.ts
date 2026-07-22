@@ -123,6 +123,8 @@ export interface Video {
   views: number;
   published: boolean;
   sortOrder: number;
+  /** @nullable */
+  homeSectionId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -142,6 +144,8 @@ export interface VideoInput {
   views?: number;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }
 
 export interface VideoUpdate {
@@ -159,6 +163,8 @@ export interface VideoUpdate {
   views?: number;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }
 
 export interface YoutubeInfoRequest {

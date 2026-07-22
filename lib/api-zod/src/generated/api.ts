@@ -255,6 +255,7 @@ export const ListVideosResponseItem = zod.object({
   views: zod.number(),
   published: zod.boolean(),
   sortOrder: zod.number(),
+  homeSectionId: zod.number().nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -275,6 +276,7 @@ export const CreateVideoBody = zod.object({
   views: zod.number().optional(),
   published: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
+  homeSectionId: zod.number().nullish(),
 });
 
 /**
@@ -298,6 +300,7 @@ export const GetVideoResponse = zod.object({
   views: zod.number(),
   published: zod.boolean(),
   sortOrder: zod.number(),
+  homeSectionId: zod.number().nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });
@@ -321,6 +324,7 @@ export const UpdateVideoBody = zod.object({
   views: zod.number().optional(),
   published: zod.boolean().optional(),
   sortOrder: zod.number().optional(),
+  homeSectionId: zod.number().nullish(),
 });
 
 export const UpdateVideoResponse = zod.object({
@@ -337,6 +341,7 @@ export const UpdateVideoResponse = zod.object({
   views: zod.number(),
   published: zod.boolean(),
   sortOrder: zod.number(),
+  homeSectionId: zod.number().nullable(),
   createdAt: zod.string(),
   updatedAt: zod.string(),
 });

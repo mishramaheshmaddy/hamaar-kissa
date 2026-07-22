@@ -20,4 +20,6 @@ export interface VideoInput {
   views?: number;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }

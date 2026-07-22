@@ -20,4 +20,6 @@ export interface VideoUpdate {
   views?: number;
   published?: boolean;
   sortOrder?: number;
+  /** @nullable */
+  homeSectionId?: number | null;
 }

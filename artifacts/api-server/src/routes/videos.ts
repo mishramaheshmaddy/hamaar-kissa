@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, videosTable, categoriesTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
+import { syncHomeSectionAssignment } from "../lib/homeSectionSync";
 import {
   CreateVideoBody,
   UpdateVideoBody,
@@ -45,7 +46,9 @@ router.post("/videos", requireAdmin, async (req, res) => {
     views: body.views ?? 0,
     published: body.published ?? false,
     sortOrder: body.sortOrder ?? 0,
+    homeSectionId: body.homeSectionId ?? null,
   }).returning();
+  await syncHomeSectionAssignment("video", row.id, row.homeSectionId);
   res.status(201).json(toDto(row, null));
 });
 
@@ -66,6 +69,9 @@ router.patch("/videos/:id", requireAdmin, async (req, res) => {
   const updateData: Record<string, unknown> = { ...body, updatedAt: new Date() };
   const [row] = await db.update(videosTable).set(updateData).where(eq(videosTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  if ("homeSectionId" in body) {
+    await syncHomeSectionAssignment("video", row.id, row.homeSectionId);
+  }
   res.json(toDto(row, null));
 });
 
@@ -90,6 +96,7 @@ function toDto(row: typeof videosTable.$inferSelect, categoryName: string | null
     views: row.views,
     published: row.published,
     sortOrder: row.sortOrder,
+    homeSectionId: row.homeSectionId ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

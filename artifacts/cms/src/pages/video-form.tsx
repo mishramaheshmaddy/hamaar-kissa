@@ -33,6 +33,7 @@ const schema = z.object({
   searchTags: z.string().optional(),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
+  homeSectionId: z.coerce.number().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -49,6 +50,15 @@ export default function VideoForm() {
   const { data: video, isLoading } = useGetVideo(id!, { query: { enabled: !!id, queryKey: ["video", id!] } });
   const { data: categoriesRaw } = useListCategories({});
   const categories = categoriesRaw?.filter((c) => c.type === "video" || c.type === "both");
+
+  // Fetch home sections for dropdown
+  const [homeSections, setHomeSections] = useState<{id: number; title: string}[]>([]);
+  useEffect(() => {
+    fetch("/api/home-sections/all", { credentials: "include", cache: "no-store" })
+      .then(r => r.json())
+      .then(data => setHomeSections(data))
+      .catch(() => {});
+  }, []);
   
   const createVideo = useCreateVideo();
   const updateVideo = useUpdateVideo();
@@ -71,6 +81,7 @@ export default function VideoForm() {
       searchTags: "",
       published: false,
       sortOrder: 0,
+      homeSectionId: undefined,
     },
   });
 
@@ -87,6 +98,7 @@ export default function VideoForm() {
         searchTags: video.searchTags || "",
         published: video.published,
         sortOrder: video.sortOrder,
+        homeSectionId: video.homeSectionId || undefined,
       });
       // Belt-and-suspenders: Radix Select can fail to reflect a value that
       // arrives right as it first mounts, even though the underlying form
@@ -385,6 +397,36 @@ export default function VideoForm() {
                   />
                 )}
               </div>
+
+              {/* Home Section Dropdown */}
+              <FormField
+                control={form.control}
+                name="homeSectionId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Home Section (Optional)</FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                      value={field.value ? String(field.value) : "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select home section" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">-- Koi nahi --</SelectItem>
+                        {homeSections?.map((sec) => (
+                          <SelectItem key={sec.id} value={sec.id.toString()}>
+                            {sec.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
