@@ -1,34 +1,48 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useListAudioStories, useUpdateAudioStory, useDeleteAudioStory, getListAudioStoriesQueryKey } from "@workspace/api-client-react";
+import { useListAudioStories, useUpdateAudioStory, useDeleteAudioStory, getListAudioStoriesQueryKey, useListCategories } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Music, Plus, Pencil, Trash2, Loader2, PlayCircle, Search } from "lucide-react";
 
 export default function AudioStories() {
   const { data: stories, isLoading } = useListAudioStories();
+  const { data: categoriesRaw } = useListCategories({ request: { headers: { "Cache-Control": "no-cache" } } });
+  const categories = useMemo(
+    () => categoriesRaw?.filter((c) => c.type === "audio" || c.type === "both") ?? [],
+    [categoriesRaw]
+  );
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const updateStory = useUpdateAudioStory();
   const deleteStory = useDeleteAudioStory();
 
   const filteredStories = useMemo(() => {
     if (!stories) return stories;
+    let result = stories;
+    if (categoryFilter !== "all") {
+      const categoryId = parseInt(categoryFilter);
+      result = result.filter((story: any) => story.categoryId === categoryId);
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return stories;
-    return stories.filter((story: any) =>
-      story.title?.toLowerCase().includes(q) ||
-      story.categoryName?.toLowerCase().includes(q) ||
-      story.narrator?.toLowerCase().includes(q) ||
-      story.searchTags?.toLowerCase().includes(q)
-    );
-  }, [stories, search]);
+    if (q) {
+      result = result.filter((story: any) =>
+        story.title?.toLowerCase().includes(q) ||
+        story.categoryName?.toLowerCase().includes(q) ||
+        story.narrator?.toLowerCase().includes(q) ||
+        story.searchTags?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [stories, search, categoryFilter]);
 
   const handleTogglePublished = (id: number, published: boolean) => {
     updateStory.mutate(
@@ -79,14 +93,29 @@ export default function AudioStories() {
         </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input
-          className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background"
-          placeholder="Search by title, category, or narrator..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background"
+            placeholder="Search by title, category, or narrator..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id.toString()}>
+                {cat.icon} {cat.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -101,7 +130,7 @@ export default function AudioStories() {
             </div>
           ) : !filteredStories?.length ? (
             <div className="p-8 text-center text-muted-foreground">
-              No audio stories match "{search}".
+              {search ? `No audio stories match "${search}".` : "No audio stories found in this category."}
             </div>
           ) : (
             <div className="divide-y">

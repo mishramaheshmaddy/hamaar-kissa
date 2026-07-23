@@ -1,33 +1,47 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useListVideos, useUpdateVideo, useDeleteVideo, getListVideosQueryKey } from "@workspace/api-client-react";
+import { useListVideos, useUpdateVideo, useDeleteVideo, getListVideosQueryKey, useListCategories } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Video as VideoIcon, Plus, Pencil, Trash2, Loader2, PlayCircle, Eye, Search } from "lucide-react";
 
 export default function Videos() {
   const { data: videos, isLoading } = useListVideos();
+  const { data: categoriesRaw } = useListCategories({ request: { headers: { "Cache-Control": "no-cache" } } });
+  const categories = useMemo(
+    () => categoriesRaw?.filter((c) => c.type === "video" || c.type === "both") ?? [],
+    [categoriesRaw]
+  );
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const updateVideo = useUpdateVideo();
   const deleteVideo = useDeleteVideo();
 
   const filteredVideos = useMemo(() => {
     if (!videos) return videos;
+    let result = videos;
+    if (categoryFilter !== "all") {
+      const categoryId = parseInt(categoryFilter);
+      result = result.filter((video: any) => video.categoryId === categoryId);
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return videos;
-    return videos.filter((video: any) =>
-      video.title?.toLowerCase().includes(q) ||
-      video.categoryName?.toLowerCase().includes(q) ||
-      video.searchTags?.toLowerCase().includes(q)
-    );
-  }, [videos, search]);
+    if (q) {
+      result = result.filter((video: any) =>
+        video.title?.toLowerCase().includes(q) ||
+        video.categoryName?.toLowerCase().includes(q) ||
+        video.searchTags?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [videos, search, categoryFilter]);
 
   const handleTogglePublished = (id: number, published: boolean) => {
     updateVideo.mutate(
@@ -72,14 +86,29 @@ export default function Videos() {
         </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input
-          className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background"
-          placeholder="Search by title or category..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background"
+            placeholder="Search by title or category..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id.toString()}>
+                {cat.icon} {cat.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -94,7 +123,7 @@ export default function Videos() {
             </div>
           ) : !filteredVideos?.length ? (
             <div className="p-8 text-center text-muted-foreground">
-              No videos match "{search}".
+              {search ? `No videos match "${search}".` : "No videos found in this category."}
             </div>
           ) : (
             <div className="divide-y">
