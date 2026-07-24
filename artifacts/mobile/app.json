@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hamaar Kissa",
     "slug": "hamaar-kissa",
-    "version": "1.0.18",
+    "version": "1.0.19",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "scheme": "hamaarkissa",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.haamarkissa.app",
-      "versionCode": 20,
+      "versionCode": 21,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#E8530A"
@@ -30,7 +30,26 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "hamaar-kissa-api.onrender.com",
+              "pathPrefix": "/share"
+            },
+            {
+              "scheme": "https",
+              "host": "hamaar-kissa-api.onrender.com",
+              "pathPrefix": "/content"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/images/logo.png"

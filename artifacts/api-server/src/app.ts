@@ -3,6 +3,8 @@ import cors from "cors";
 import session from "express-session";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import shareRouter from "./routes/share";
+import wellKnownRouter from "./routes/wellKnown";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -42,6 +44,13 @@ app.use(
     },
   }),
 );
+
+// Public share landing pages — must be at root (no /api prefix), since these
+// URLs are shared externally (WhatsApp, etc.) as e.g. https://<domain>/share/audio/5
+app.use(shareRouter);
+
+// Android App Links verification file — must be served at exactly this root path
+app.use(wellKnownRouter);
 
 app.use("/api", router);
 
