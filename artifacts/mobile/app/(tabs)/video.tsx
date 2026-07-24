@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useFocusEffect } from "expo-router";
 import { useAudio } from "@/context/AudioContext";
 import {
@@ -25,6 +25,18 @@ import { VideoItem } from "@/data/mockData";
 const { height } = Dimensions.get("window");
 const CARD_HEIGHT = height;
 
+// Fisher–Yates shuffle — used so the video feed doesn't always start with
+// the same video (e.g. lowest sortOrder/id, which the API always returns
+// first). Returns a new array; does not mutate the input.
+function shuffleArray<T>(arr: T[]): T[] {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 function mapVideo(v: ApiVideo, catName: string): VideoItem {
   return {
     id: String(v.id),
@@ -50,24 +62,43 @@ export default function VideoScreen() {
   const [activeCategory, setActiveCategory] = useState<number | "all">("all");
   const { pauseAudio } = useAudio();
 
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [feedItems, setFeedItems] = useState<VideoItem[]>([]);
+  const flatListRef = useRef<FlatList<VideoItem>>(null);
+
+  const filteredVideos = useMemo(
+    () => (activeCategory === "all" ? videos : videos.filter((v) => v.categoryId === activeCategory)),
+    [videos, activeCategory]
+  );
+
   // Watching a video is a deliberate choice to switch away from listening —
   // stop any playing audio the moment this tab is focused, so the two never
   // play on top of each other. Audio is left untouched everywhere else
   // (Home, Profile, Categories, etc.) via the persistent mini-player.
+  //
+  // We also reshuffle the feed and jump back to the top every time the user
+  // navigates INTO this tab, so it doesn't always open on the same video
+  // (previously always the lowest sortOrder/id, e.g. Pashupatinath Mandir) —
+  // matches the "always fresh" feel of Reels/TikTok.
   useFocusEffect(
     useCallback(() => {
       pauseAudio();
+      if (filteredVideos.length > 0) {
+        setFeedItems(shuffleArray(filteredVideos));
+        setActiveIndex(0);
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        });
+      }
 
       return () => {
         // Leaving Video tab
         setActiveIndex(-1);
       };
-    }, [pauseAudio])
+    }, [pauseAudio, filteredVideos])
   );
-
-  const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : 0;
@@ -124,20 +155,15 @@ export default function VideoScreen() {
     }, [loadData])
   );
 
-  const filteredVideos = activeCategory === "all"
-    ? videos
-    : videos.filter((v) => v.categoryId === activeCategory);
-
-  // The actual list rendered in the FlatList. Starts as a straight copy of
-  // filteredVideos; once the user nears the end, we append another random
-  // batch drawn from the same filtered set (with repeats) so the feed
-  // never visibly "runs out" — same idea as Reels/TikTok once you've seen
-  // everything once.
-  const [feedItems, setFeedItems] = useState<VideoItem[]>([]);
+  // The actual list rendered in the FlatList. Starts as a shuffled copy of
+  // filteredVideos (see the focus effect above); once the user nears the
+  // end, we append another random batch drawn from the same filtered set
+  // (with repeats) so the feed never visibly "runs out" — same idea as
+  // Reels/TikTok once you've seen everything once.
   const MAX_FEED_LENGTH = 300; // sane cap so memory doesn't grow forever in one long session
 
   useEffect(() => {
-    setFeedItems(filteredVideos);
+    setFeedItems(shuffleArray(filteredVideos));
     setActiveIndex(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, videos]);
@@ -211,6 +237,7 @@ export default function VideoScreen() {
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={feedItems}
           keyExtractor={(item, index) => `${item.id}-${index}`}
           pagingEnabled
