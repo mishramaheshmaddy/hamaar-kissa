@@ -1,5 +1,5 @@
-import { db, pushTokensTable } from "@workspace/db";
-import { inArray, isNotNull } from "drizzle-orm";
+import { db, pushTokensTable, audioStoriesTable, videosTable } from "@workspace/db";
+import { inArray, isNotNull, eq } from "drizzle-orm";
 import { logger } from "./logger";
 
 // Assumes India-only phone numbers (+91), consistent with the rest of this
@@ -64,6 +64,35 @@ export async function resolveTokensForPhones(
   return { tokens, matched, unmatched };
 }
 
+/**
+ * Looks up the thumbnail for a piece of attached content (audio story or
+ * video), so a push notification can show it in the notification tray
+ * (Android's "big picture" image) instead of just plain text.
+ */
+export async function resolveContentImageUrl(
+  contentType: string | null | undefined,
+  contentId: number | null | undefined,
+): Promise<string | undefined> {
+  if (!contentType || !contentId) return undefined;
+  if (contentType === "audio") {
+    const [row] = await db
+      .select({ thumbnailUrl: audioStoriesTable.thumbnailUrl })
+      .from(audioStoriesTable)
+      .where(eq(audioStoriesTable.id, contentId))
+      .limit(1);
+    return row?.thumbnailUrl ?? undefined;
+  }
+  if (contentType === "video") {
+    const [row] = await db
+      .select({ thumbnailUrl: videosTable.thumbnailUrl })
+      .from(videosTable)
+      .where(eq(videosTable.id, contentId))
+      .limit(1);
+    return row?.thumbnailUrl ?? undefined;
+  }
+  return undefined;
+}
+
 // Same lazy-init pattern as routes/firebaseAuth.ts — reuses the same
 // FIREBASE_SERVICE_ACCOUNT credential, guarded so multiple call sites can
 // safely call this without double-initializing the Firebase app.
@@ -90,6 +119,7 @@ export async function sendPushToTokens(
   title: string,
   body: string,
   data?: Record<string, string>,
+  imageUrl?: string,
 ): Promise<{ sent: number; failed: number }> {
   if (tokens.length === 0) return { sent: 0, failed: 0 };
 
@@ -104,9 +134,13 @@ export async function sendPushToTokens(
     try {
       const result = await messaging.sendEachForMulticast({
         tokens: chunk,
-        notification: { title, body },
+        notification: { title, body, ...(imageUrl ? { imageUrl } : {}) },
         data,
-        android: { priority: "high" },
+        android: {
+          priority: "high",
+          ...(imageUrl ? { notification: { imageUrl } } : {}),
+        },
+        apns: imageUrl ? { fcmOptions: { imageUrl } } : undefined,
       });
       sent += result.successCount;
       failed += result.failureCount;

@@ -6,7 +6,7 @@ import {
   scheduledNotificationsTable,
   pushTokensTable,
 } from "@workspace/db";
-import { sendPushToTokens, resolveTokensForPhones } from "./push";
+import { sendPushToTokens, resolveTokensForPhones, resolveContentImageUrl } from "./push";
 import { logger } from "./logger";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
@@ -37,11 +37,13 @@ async function runDailyCycleCheck() {
 
   const tokens = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
   if (tokens.length > 0) {
+    const imageUrl = await resolveContentImageUrl(settings.dailyCycleContentType, settings.dailyCycleContentId);
     const result = await sendPushToTokens(
       tokens.map((t) => t.token),
       settings.dailyCycleTitle,
       settings.dailyCycleBody,
       buildDeepLinkData(settings.dailyCycleContentType, settings.dailyCycleContentId),
+      imageUrl,
     );
     logger.info({ ...result }, "Daily cycle notification sent");
   }
@@ -75,11 +77,13 @@ async function runScheduledCheck() {
         tokens = rows.map((r) => r.token);
       }
       if (tokens.length > 0) {
+        const imageUrl = await resolveContentImageUrl(item.contentType, item.contentId);
         await sendPushToTokens(
           tokens,
           item.title,
           item.body,
           buildDeepLinkData(item.contentType, item.contentId),
+          imageUrl,
         );
       }
       await db

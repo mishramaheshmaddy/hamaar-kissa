@@ -7,7 +7,7 @@ import {
   scheduledNotificationsTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
-import { sendPushToTokens, resolveTokensForPhones } from "../lib/push";
+import { sendPushToTokens, resolveTokensForPhones, resolveContentImageUrl } from "../lib/push";
 
 const router = Router();
 
@@ -127,8 +127,9 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => 
       tokens = rows.map((r) => r.token);
     }
 
+    const imageUrl = await resolveContentImageUrl(contentType, contentId);
     const result = tokens.length
-      ? await sendPushToTokens(tokens, title.trim(), body.trim(), buildDeepLinkData(contentType, contentId))
+      ? await sendPushToTokens(tokens, title.trim(), body.trim(), buildDeepLinkData(contentType, contentId), imageUrl)
       : { sent: 0, failed: 0 };
 
     const [record] = await db

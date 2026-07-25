@@ -51,10 +51,14 @@ function ContentPicker({
   contentType,
   contentId,
   onChange,
+  onSelectItem,
 }: {
   contentType: string | null;
   contentId: number | null;
   onChange: (type: string | null, id: number | null) => void;
+  // Fires with the full selected item (or null on deselect) so the caller
+  // can auto-fill Title/Message from its name + description.
+  onSelectItem?: (item: { title: string; description?: string | null } | null) => void;
 }) {
   const { data: stories } = useListAudioStories();
   const { data: videos } = useListVideos();
@@ -74,12 +78,24 @@ function ContentPicker({
 
   const selected = items.find((i) => i.id === contentId);
 
+  const handlePick = (item: any) => {
+    if (item.id === contentId) {
+      // Deselecting the currently-picked item — clears it and re-enables
+      // the rest of the list for picking something else.
+      onChange(contentType, null);
+      onSelectItem?.(null);
+    } else {
+      onChange(contentType, item.id);
+      onSelectItem?.({ title: item.title, description: item.description });
+    }
+  };
+
   return (
     <div className="space-y-2">
       <Label>Attach content (optional)</Label>
       <Select
         value={contentType ?? "none"}
-        onValueChange={(v) => { onChange(v === "none" ? null : v, null); setQuery(""); }}
+        onValueChange={(v) => { onChange(v === "none" ? null : v, null); onSelectItem?.(null); setQuery(""); }}
       >
         <SelectTrigger>
           <SelectValue />
@@ -109,23 +125,34 @@ function ContentPicker({
             {items.length === 0 ? (
               <p className="text-sm text-muted-foreground p-3">कुछु नइखे मिलल</p>
             ) : (
-              items.map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => onChange(contentType, item.id === contentId ? null : item.id)}
-                  className="w-full flex items-center gap-2 p-2 text-left text-sm hover:bg-muted/50 transition-colors"
-                >
-                  <span
-                    className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
-                      item.id === contentId ? "bg-primary border-primary" : "border-muted-foreground/40"
+              items.map((item) => {
+                const isSelected = item.id === contentId;
+                // Once something's picked, every other row becomes
+                // unclickable/greyed out — only the selected row (to
+                // deselect) stays interactive. Matches how a notification
+                // can only ever deep-link to a single piece of content.
+                const disabled = contentId !== null && !isSelected;
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    disabled={disabled}
+                    onClick={() => handlePick(item)}
+                    className={`w-full flex items-center gap-2 p-2 text-left text-sm transition-colors ${
+                      disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-muted/50"
                     }`}
                   >
-                    {item.id === contentId && <Check className="w-3 h-3 text-primary-foreground" />}
-                  </span>
-                  <span className="truncate">{item.title}</span>
-                </button>
-              ))
+                    <span
+                      className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
+                        isSelected ? "bg-primary border-primary" : "border-muted-foreground/40"
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                    </span>
+                    <span className="truncate">{item.title}</span>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -560,6 +587,15 @@ export default function Notifications() {
             contentType={contentType}
             contentId={contentId}
             onChange={(t, id) => { setContentType(t); setContentId(id); }}
+            onSelectItem={(item) => {
+              // Auto-fills from the picked content's name + description —
+              // still a normal editable field afterward, this is just a
+              // starting point so the admin doesn't have to retype it.
+              if (item) {
+                setTitle(item.title);
+                if (item.description) setBody(item.description);
+              }
+            }}
           />
 
           <AudienceTarget phones={targetPhones} onChange={setTargetPhones} />
@@ -670,6 +706,12 @@ export default function Notifications() {
               contentType={dialogContentType}
               contentId={dialogContentId}
               onChange={(t, id) => { setDialogContentType(t); setDialogContentId(id); }}
+              onSelectItem={(item) => {
+                if (item) {
+                  setDialogTitle(item.title);
+                  if (item.description) setDialogBody(item.description);
+                }
+              }}
             />
           </div>
           <DialogFooter>
