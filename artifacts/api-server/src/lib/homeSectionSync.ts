@@ -37,3 +37,25 @@ export async function syncHomeSectionAssignment(
     sortOrder: existingInSection.length, // append after existing manually-curated items
   });
 }
+
+/**
+ * Looks up which home section (if any) a piece of content is actually
+ * assigned to, straight from home_section_items — the real source of
+ * truth the mobile home screen reads. Content can also be added to a
+ * section from the Home Section page's own content picker, which only
+ * writes here and never touches the audio_stories/videos row's own
+ * homeSectionId column — so that column can go stale. Callers that need
+ * to show or pre-fill the "current" home section (e.g. the Add/Edit
+ * Story/Video form) should use this instead of trusting the row column.
+ */
+export async function getHomeSectionIdForContent(
+  contentType: "audio" | "video",
+  contentId: number,
+): Promise<number | null> {
+  const [row] = await db
+    .select({ homeSectionId: homeSectionItemsTable.homeSectionId })
+    .from(homeSectionItemsTable)
+    .where(and(eq(homeSectionItemsTable.contentType, contentType), eq(homeSectionItemsTable.contentId, contentId)))
+    .limit(1);
+  return row?.homeSectionId ?? null;
+}

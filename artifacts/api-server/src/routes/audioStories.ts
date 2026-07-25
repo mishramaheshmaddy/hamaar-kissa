@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, audioStoriesTable, categoriesTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
-import { syncHomeSectionAssignment } from "../lib/homeSectionSync";
+import { syncHomeSectionAssignment, getHomeSectionIdForContent } from "../lib/homeSectionSync";
 import {
   CreateAudioStoryBody,
   UpdateAudioStoryBody,
@@ -65,7 +65,11 @@ router.get("/audio-stories/:id", async (req, res) => {
     .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
     .where(eq(audioStoriesTable.id, id));
   if (!rows[0]) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(toDto(rows[0].story, rows[0].categoryName));
+  // The row's own homeSectionId column can be stale (e.g. content assigned
+  // via the Home Section page's own picker never updates it), so resolve
+  // the real current assignment from home_section_items for accuracy.
+  const homeSectionId = await getHomeSectionIdForContent("audio", id);
+  res.json(toDto(rows[0].story, rows[0].categoryName, homeSectionId));
 });
 
 router.patch("/audio-stories/:id", requireAdmin, async (req, res) => {
@@ -89,7 +93,7 @@ router.delete("/audio-stories/:id", requireAdmin, async (req, res) => {
   res.status(204).send();
 });
 
-function toDto(row: typeof audioStoriesTable.$inferSelect, categoryName: string | null | undefined) {
+function toDto(row: typeof audioStoriesTable.$inferSelect, categoryName: string | null | undefined, resolvedHomeSectionId?: number | null) {
   return {
     id: row.id,
     title: row.title,
@@ -104,7 +108,7 @@ function toDto(row: typeof audioStoriesTable.$inferSelect, categoryName: string 
     searchTags: row.searchTags ?? "",
     published: row.published,
     sortOrder: row.sortOrder,
-    homeSectionId: row.homeSectionId ?? null,
+    homeSectionId: resolvedHomeSectionId !== undefined ? resolvedHomeSectionId : (row.homeSectionId ?? null),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

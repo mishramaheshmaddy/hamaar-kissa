@@ -33,7 +33,10 @@ const schema = z.object({
   searchTags: z.string().optional(),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
-  homeSectionId: z.coerce.number().nullable().optional(),
+  homeSectionId: z.preprocess(
+    (val) => (val === "" || val === undefined || (typeof val === "number" && Number.isNaN(val)) ? null : val),
+    z.coerce.number().nullable()
+  ).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -111,6 +114,7 @@ export default function VideoForm() {
       if (video.sourceType) {
         setTimeout(() => { form.setValue("sourceType", video.sourceType); }, 500);
       }
+      setTimeout(() => { form.setValue("homeSectionId", video.homeSectionId ?? null); }, 500);
     }
   }, [video, isNew, categoriesRaw, form]);
 

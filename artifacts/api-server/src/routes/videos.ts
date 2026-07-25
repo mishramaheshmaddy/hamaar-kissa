@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, videosTable, categoriesTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
-import { syncHomeSectionAssignment } from "../lib/homeSectionSync";
+import { syncHomeSectionAssignment, getHomeSectionIdForContent } from "../lib/homeSectionSync";
 import {
   CreateVideoBody,
   UpdateVideoBody,
@@ -60,7 +60,11 @@ router.get("/videos/:id", async (req, res) => {
     .leftJoin(categoriesTable, eq(videosTable.categoryId, categoriesTable.id))
     .where(eq(videosTable.id, id));
   if (!rows[0]) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(toDto(rows[0].video, rows[0].categoryName));
+  // The row's own homeSectionId column can be stale (e.g. content assigned
+  // via the Home Section page's own picker never updates it), so resolve
+  // the real current assignment from home_section_items for accuracy.
+  const homeSectionId = await getHomeSectionIdForContent("video", id);
+  res.json(toDto(rows[0].video, rows[0].categoryName, homeSectionId));
 });
 
 router.patch("/videos/:id", requireAdmin, async (req, res) => {
@@ -81,7 +85,7 @@ router.delete("/videos/:id", requireAdmin, async (req, res) => {
   res.status(204).send();
 });
 
-function toDto(row: typeof videosTable.$inferSelect, categoryName: string | null | undefined) {
+function toDto(row: typeof videosTable.$inferSelect, categoryName: string | null | undefined, resolvedHomeSectionId?: number | null) {
   return {
     id: row.id,
     title: row.title,
@@ -96,7 +100,7 @@ function toDto(row: typeof videosTable.$inferSelect, categoryName: string | null
     views: row.views,
     published: row.published,
     sortOrder: row.sortOrder,
-    homeSectionId: row.homeSectionId ?? null,
+    homeSectionId: resolvedHomeSectionId !== undefined ? resolvedHomeSectionId : (row.homeSectionId ?? null),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

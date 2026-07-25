@@ -34,7 +34,10 @@ const schema = z.object({
   searchTags: z.string().optional(),
   published: z.boolean().default(false),
   sortOrder: z.coerce.number().min(0).default(0),
-  homeSectionId: z.coerce.number().nullable().optional(),
+  homeSectionId: z.preprocess(
+    (val) => (val === "" || val === undefined || (typeof val === "number" && Number.isNaN(val)) ? null : val),
+    z.coerce.number().nullable()
+  ).optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -130,6 +133,11 @@ export default function AudioStoryForm() {
       if (story.categoryId) {
         setTimeout(() => { form.setValue("categoryId", story.categoryId!); }, 500);
       }
+      // Same timing fix as categoryId above: the Home Section dropdown's
+      // options load async, so explicitly re-set the value once they're
+      // likely in, otherwise the Select can show "-- Koi nahi --" even
+      // when the story is actually assigned to a section.
+      setTimeout(() => { form.setValue("homeSectionId", story.homeSectionId ?? null); }, 500);
     }
   }, [story, isNew]);
 
