@@ -135,7 +135,7 @@ export default function HomeScreen() {
         apiFetch<ApiAudioStory[]>("/api/audio-stories?published=true"),
       ]);
       setSections(homeSections);
-      setCategories(allCats);
+      setCategories(allCats.filter((c) => c.active));
       setAllAudioRaw(audioStories);
       lastRefreshedAtRef.current = Date.now();
     } catch (_e) {

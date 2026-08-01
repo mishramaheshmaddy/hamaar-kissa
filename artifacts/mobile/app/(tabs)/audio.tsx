@@ -67,7 +67,7 @@ export default function AudioScreen() {
         apiFetch<ApiCategory[]>("/api/categories"),
       ]);
 
-      const audioCats = allCats.filter((c) => c.type === "audio" || c.type === "both");
+      const audioCats = allCats.filter((c) => c.active && (c.type === "audio" || c.type === "both"));
       const catMap: Record<number, string> = {};
       for (const c of allCats) catMap[c.id] = c.name;
 

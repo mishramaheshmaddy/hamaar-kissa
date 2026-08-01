@@ -115,7 +115,7 @@ export default function VideoScreen() {
         apiFetch<ApiCategory[]>("/api/categories"),
       ]);
 
-      const videoCats = allCats.filter((c) => c.type === "video" || c.type === "both");
+      const videoCats = allCats.filter((c) => c.active && (c.type === "video" || c.type === "both"));
       const catMap: Record<number, string> = {};
       for (const c of allCats) catMap[c.id] = c.name;
 

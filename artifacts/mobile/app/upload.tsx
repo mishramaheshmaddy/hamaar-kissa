@@ -50,7 +50,7 @@ export default function UploadScreen() {
 
   useEffect(() => {
     apiFetch<ApiCategory[]>("/api/categories").then((cats) => {
-      setCategories(cats.filter((c) => c.type === "audio" || c.type === "both"));
+      setCategories(cats.filter((c) => c.active && (c.type === "audio" || c.type === "both")));
     }).catch(() => {});
   }, []);
 

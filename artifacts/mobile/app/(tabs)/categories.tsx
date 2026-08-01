@@ -36,7 +36,7 @@ export default function CategoriesScreen() {
         if (cancelled) return;
 
         const audioCats = allCats.filter(
-          (c) => c.type === "audio" || c.type === "both"
+          (c) => c.active && (c.type === "audio" || c.type === "both")
         );
         setCategories(audioCats);
 
