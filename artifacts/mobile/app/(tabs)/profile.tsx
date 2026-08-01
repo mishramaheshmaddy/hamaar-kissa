@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   RefreshControl,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useAudio, AudioStory } from "@/context/AudioContext";
 import { useColors } from "@/hooks/useColors";
+import { useTheme } from "@/theme/useTheme";
 import AudioCard from "@/components/AudioCard";
 import MiniPlayer from "@/components/MiniPlayer";
 import { apiFetch, ApiAudioStory, ApiCategory, BASE } from "@/lib/api";
@@ -84,6 +86,7 @@ const SETTINGS = [
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const { mode, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { savedStories, likedStories, history, playStory, currentStory, isPlaying, sleepTimerMinutes, clearUserLibrary } = useAudio();
@@ -343,10 +346,10 @@ export default function ProfileScreen() {
         </View>
 
         <View style={[styles.settingsSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {SETTINGS.map((item, i) => (
+          {SETTINGS.map((item) => (
             <TouchableOpacity
               key={item.label}
-              style={[styles.settingsRow, i < SETTINGS.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
+              style={[styles.settingsRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
               onPress={() => {
                 Haptics.selectionAsync();
                 router.push(item.route as any);
@@ -366,6 +369,26 @@ export default function ProfileScreen() {
               <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))}
+
+          {/* Dark Mode toggle — the ONLY place in the app this control lives. */}
+          <View style={styles.settingsRow}>
+            <View style={[styles.settingsIcon, { backgroundColor: colors.secondary }]}>
+              <Text style={{ fontSize: 18 }}>🎨</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingsLabel, { color: colors.foreground }]}>बैकग्राउंड कलर</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>लाइट / डार्क मोड चुनें</Text>
+            </View>
+            <Switch
+              value={mode === "dark"}
+              onValueChange={() => {
+                Haptics.selectionAsync();
+                toggleTheme();
+              }}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
 
         {user ? (
