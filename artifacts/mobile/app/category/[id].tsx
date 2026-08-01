@@ -127,7 +127,7 @@ export default function CategoryDetailScreen() {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerIcon}>{category?.icon ?? "🎙️"}</Text>
-          <Text style={styles.headerTitle}>{category?.label ?? "..."}</Text>
+          <Text style={styles.headerTitle}>{category ? (category.label || category.name) : "..."}</Text>
           <Text style={styles.headerSubtitle}>
             {loading ? "..." : `${totalCount} ${totalCount === 1 ? "कहानी" : "कहानी"}`}
           </Text>

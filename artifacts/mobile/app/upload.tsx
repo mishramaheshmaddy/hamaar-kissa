@@ -346,7 +346,7 @@ export default function UploadScreen() {
             >
               <Text style={{ fontSize: 18 }}>{cat.icon}</Text>
               <Text style={[styles.catLabel, { color: categoryId === cat.id ? "#fff" : colors.foreground }]}>
-                {cat.label}
+                {cat.label || cat.name}
               </Text>
             </TouchableOpacity>
           ))}

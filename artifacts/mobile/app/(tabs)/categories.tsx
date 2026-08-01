@@ -108,7 +108,7 @@ export default function CategoriesScreen() {
                 activeOpacity={0.85}
               >
                 <Text style={styles.cardIcon}>{item.icon}</Text>
-                <Text style={styles.cardTitle}>{item.label}</Text>
+                <Text style={styles.cardTitle}>{item.label || item.name}</Text>
                 <View style={styles.cardFooter}>
                   <View style={styles.countBadge}>
                     <Text style={styles.countText}>

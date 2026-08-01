@@ -219,8 +219,9 @@ export default function VideoScreen() {
                 },
               ]}
             >
+              <Text style={styles.pillIcon}>{cat.icon} </Text>
               <Text style={[styles.pillText, { color: activeCategory === cat.id ? "#fff" : "rgba(255,255,255,0.8)", fontWeight: activeCategory === cat.id ? "700" : "500" }]}>
-                {cat.icon} {cat.label}
+                {cat.label || cat.name}
               </Text>
             </TouchableOpacity>
           ))}
@@ -266,7 +267,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   categoryBar: { position: "absolute", left: 0, right: 0, zIndex: 10 },
   categories: { paddingHorizontal: 12, paddingVertical: 6, gap: 8 },
-  categoryPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryPill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  pillIcon: { fontSize: 13 },
   pillText: { fontSize: 13 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 });

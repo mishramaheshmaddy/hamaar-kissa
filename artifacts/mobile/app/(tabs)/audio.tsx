@@ -176,8 +176,9 @@ export default function AudioScreen() {
                   },
                 ]}
               >
+                <Text style={styles.pillIcon}>{cat.icon} </Text>
                 <Text style={[styles.pillText, { color: activeCategory === cat.id ? colors.primaryForeground : colors.foreground }]}>
-                  {cat.icon} {cat.label}
+                  {cat.label || cat.name}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -244,7 +245,8 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14 },
   categoryRow: { height: 56 },
   categories: { paddingHorizontal: 16, paddingVertical: 10, gap: 8, alignItems: "center" },
-  categoryPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryPill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  pillIcon: { fontSize: 12 },
   pillText: { fontSize: 12, fontWeight: "600" },
   list: { paddingHorizontal: 16, paddingBottom: 140 },
   row: { gap: 12, marginBottom: 12 },

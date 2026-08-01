@@ -47,10 +47,13 @@ export const ListCategoriesResponse = zod.array(ListCategoriesResponseItem);
 /**
  * @summary Create a category
  */
+// NOTE: name/label/icon now require min length 1 (hand-synced with
+// lib/api-spec/openapi.yaml's minLength: 1 — this will regenerate
+// identically next time `pnpm codegen` runs).
 export const CreateCategoryBody = zod.object({
-  name: zod.string(),
-  label: zod.string(),
-  icon: zod.string(),
+  name: zod.string().min(1),
+  label: zod.string().min(1),
+  icon: zod.string().min(1),
   type: zod.string(),
   sortOrder: zod.number().optional(),
   active: zod.boolean().optional(),
@@ -83,9 +86,9 @@ export const UpdateCategoryParams = zod.object({
 });
 
 export const UpdateCategoryBody = zod.object({
-  name: zod.string().optional(),
-  label: zod.string().optional(),
-  icon: zod.string().optional(),
+  name: zod.string().min(1).optional(),
+  label: zod.string().min(1).optional(),
+  icon: zod.string().min(1).optional(),
   type: zod.string().optional(),
   sortOrder: zod.number().optional(),
   active: zod.boolean().optional(),

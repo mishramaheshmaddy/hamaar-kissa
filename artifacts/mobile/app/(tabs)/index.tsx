@@ -329,8 +329,9 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/category/${cat.id}` as any)}
                 style={[styles.categoryPill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
               >
+                <Text style={styles.categoryPillIcon}>{cat.icon} </Text>
                 <Text style={[styles.categoryPillText, { color: colors.foreground }]}>
-                  {cat.icon} {cat.label}
+                  {cat.label || cat.name}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -405,7 +406,8 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, borderWidth: 1, gap: 10, marginBottom: 4 },
   searchInput: { flex: 1, fontSize: 15 },
   categories: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
-  categoryPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryPill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  categoryPillIcon: { fontSize: 13 },
   categoryPillText: { fontSize: 13, fontWeight: "600" },
   loadingBox: { paddingTop: 60, alignItems: "center" },
   horizontalList: { paddingLeft: 16, paddingRight: 4 },
