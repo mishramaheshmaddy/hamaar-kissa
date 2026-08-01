@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
   info: { padding: 10, gap: 4 },
   categoryBadge: { alignSelf: "flex-start", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   categoryText: { fontSize: 10, fontWeight: "600" },
-  title: { fontSize: 13, fontWeight: "700", lineHeight: 18 },
+  title: { fontSize: 13, fontWeight: "700", lineHeight: 18, minHeight: 36 },
   actionsRow: {
     flexDirection: "row",
     gap: 6,
