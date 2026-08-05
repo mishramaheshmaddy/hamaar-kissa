@@ -1,4 +1,4 @@
-import { LayoutDashboard, Library, Music, Video as VideoIcon, LogOut, LayoutGrid, Users as UsersIcon, UploadCloud, Bell } from "lucide-react";
+import { LayoutDashboard, Library, Music, Video as VideoIcon, LogOut, LayoutGrid, Users as UsersIcon, UploadCloud, Bell, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const links = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/home-screen", label: "Home Screen", icon: LayoutGrid },
     { href: "/categories", label: "Categories", icon: Library },
     { href: "/audio-stories", label: "Audio Stories", icon: Music },

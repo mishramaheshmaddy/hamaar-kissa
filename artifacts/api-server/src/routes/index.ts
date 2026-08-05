@@ -14,6 +14,7 @@ import firebaseAuthRouter from "./firebaseAuth";
 import searchRouter from "./search";
 import pushTokensRouter from "./pushTokens";
 import notificationsRouter from "./notifications";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(firebaseAuthRouter);
 router.use(searchRouter);
 router.use(pushTokensRouter);
 router.use(notificationsRouter);
+router.use(analyticsRouter);
 
 export default router;
