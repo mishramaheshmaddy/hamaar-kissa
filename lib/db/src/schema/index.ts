@@ -8,3 +8,4 @@ export * from "./homeSectionItems";
 export * from "./pushTokens";
 export * from "./notificationSettings";
 export * from "./scheduledNotifications";
+export * from "./analyticsEvents";

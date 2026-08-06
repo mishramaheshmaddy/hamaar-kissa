@@ -22,7 +22,7 @@ import { useColors } from "@/hooks/useColors";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
-import { apiFetch, ApiAudioStory } from "@/lib/api";
+import { apiFetch, ApiAudioStory, trackEvent } from "@/lib/api";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
@@ -246,6 +246,7 @@ async function handleShare() {
         downloadedAt: new Date().toISOString(),
       });
       setDownloadProgress(null);
+      trackEvent("download", "story", currentStory.id);
       Alert.alert("✅", "डाउनलोड पूरा भइल!");
     } catch (e) {
       console.error("startDownload error:", e, "url:", fullAudioUrl);

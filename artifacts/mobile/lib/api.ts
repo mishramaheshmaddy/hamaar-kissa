@@ -1,5 +1,7 @@
 const FALLBACK_BASE = "https://hamaar-kissa-api.onrender.com";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 function getBase() {
   const envDomain = process.env["EXPO_PUBLIC_DOMAIN"];
   if (envDomain) {
@@ -59,4 +61,37 @@ export async function apiFetch<T>(path: string): Promise<T> {
   }
 
   return res.json() as Promise<T>;
+}
+
+// ---------------------------------------------------------------------
+// Analytics event tracking (Phase 2) — story_play / video_play /
+// download / like / save. Deliberately fire-and-forget: callers should
+// NOT await this in a way that blocks the UI, and it must never throw —
+// a flaky network or a slow/down analytics endpoint should never be
+// visible to someone listening to a story or watching a video.
+// ---------------------------------------------------------------------
+export type AnalyticsEventType = "story_play" | "video_play" | "download" | "like" | "save";
+export type AnalyticsContentType = "story" | "video";
+
+export function trackEvent(
+  eventType: AnalyticsEventType,
+  contentType?: AnalyticsContentType,
+  contentId?: string | number
+): void {
+  (async () => {
+    try {
+      const token = await AsyncStorage.getItem("hk_token");
+
+      await fetch(`${BASE}/api/analytics`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ eventType, contentType, contentId }),
+      });
+    } catch {
+      // Fire-and-forget — never surface analytics failures to the user.
+    }
+  })();
 }

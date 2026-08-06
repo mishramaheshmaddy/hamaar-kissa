@@ -26,6 +26,7 @@ import {
 
 
 import { VideoItem } from "@/data/mockData";
+import { trackEvent } from "@/lib/api";
 
 const { width, height } = Dimensions.get("window");
 const CARD_HEIGHT = height;
@@ -164,6 +165,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     if (isActive && video.videoUrl && !video.youtubeId) {
       setStarted(true);
       setIsPlaying(true);
+      trackEvent("video_play", "video", video.id);
     }
   }, [isActive, video.videoUrl, video.youtubeId]);
 
@@ -218,6 +220,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
 const handlePlay = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (video.youtubeId) {
+      trackEvent("video_play", "video", video.id);
       await WebBrowser.openBrowserAsync(
         `https://www.youtube.com/watch?v=${video.youtubeId}`,
         { presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN }
@@ -225,6 +228,7 @@ const handlePlay = async () => {
     } else if (video.videoUrl) {
       if (!started) {
         setStarted(true);
+        trackEvent("video_play", "video", video.id);
       }
       setIsPlaying(true);
     }
@@ -325,6 +329,7 @@ const handlePlay = async () => {
           style={styles.actionBtn}
           onPress={async () => {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (!liked) trackEvent("like", "video", video.id);
             setLiked((l) => !l);
             setLikeCount((c) => (liked ? c - 1 : c + 1));
           }}
@@ -354,6 +359,7 @@ const handlePlay = async () => {
           style={styles.actionBtn}
           onPress={async () => {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            if (!saved) trackEvent("save", "video", video.id);
             setSaved((s) => !s);
           }}
         >

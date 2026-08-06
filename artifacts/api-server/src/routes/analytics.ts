@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { count, desc, eq, gte, ilike, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, or } from "drizzle-orm";
 import {
   db,
   usersTable,
@@ -9,8 +9,10 @@ import {
   userSubmissionsTable,
   pushTokensTable,
   scheduledNotificationsTable,
+  analyticsEventsTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
+import { verifyUserToken } from "./userAuth";
 
 const router = Router();
 
@@ -19,6 +21,87 @@ function daysAgo(n: number): Date {
   d.setDate(d.getDate() - n);
   return d;
 }
+
+// Phase 2 event types the mobile app is allowed to send. Kept as a fixed
+// list (rather than accepting anything the client sends) so a typo or a
+// future ad-hoc event on the client can't silently pollute the table.
+const ANALYTICS_EVENT_TYPES = ["story_play", "video_play", "download", "like", "save"] as const;
+type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
+
+function isAnalyticsEventType(v: unknown): v is AnalyticsEventType {
+  return typeof v === "string" && (ANALYTICS_EVENT_TYPES as readonly string[]).includes(v);
+}
+
+// content_type is deliberately open-ended at the schema level, but Phase 2
+// only ever produces these two.
+const ANALYTICS_CONTENT_TYPES = ["story", "video"] as const;
+type AnalyticsContentType = (typeof ANALYTICS_CONTENT_TYPES)[number];
+
+function isAnalyticsContentType(v: unknown): v is AnalyticsContentType {
+  return typeof v === "string" && (ANALYTICS_CONTENT_TYPES as readonly string[]).includes(v);
+}
+
+// ---------------------------------------------------------------------
+// Event tracking — POST /api/analytics
+// Fire-and-forget from the mobile app for story_play / video_play /
+// download / like / save. No admin auth (called by end users), and an
+// optional Bearer token is read on a best-effort basis only — a missing
+// or invalid token still records the event, just with userId: null,
+// since this must never block or fail visibly for the person using the app.
+// ---------------------------------------------------------------------
+router.post("/analytics", async (req, res) => {
+  try {
+    const { eventType, contentType, contentId } = req.body as {
+      eventType?: string;
+      contentType?: string | null;
+      contentId?: number | string | null;
+    };
+
+    if (!isAnalyticsEventType(eventType)) {
+      res.status(400).json({ error: "Invalid or missing eventType" });
+      return;
+    }
+
+    let normalizedContentType: AnalyticsContentType | null = null;
+    if (contentType !== undefined && contentType !== null) {
+      if (!isAnalyticsContentType(contentType)) {
+        res.status(400).json({ error: "Invalid contentType" });
+        return;
+      }
+      normalizedContentType = contentType;
+    }
+
+    let normalizedContentId: number | null = null;
+    if (contentId !== undefined && contentId !== null && contentId !== "") {
+      const n = Number(contentId);
+      if (Number.isNaN(n)) {
+        res.status(400).json({ error: "Invalid contentId" });
+        return;
+      }
+      normalizedContentId = n;
+    }
+
+    // Optional — logged-in users get attributed, guests don't.
+    let userId: number | null = null;
+    const auth = req.headers.authorization;
+    if (auth?.startsWith("Bearer ")) {
+      const decoded = verifyUserToken(auth.slice(7));
+      if (decoded) userId = decoded.userId;
+    }
+
+    await db.insert(analyticsEventsTable).values({
+      userId,
+      eventType,
+      contentType: normalizedContentType,
+      contentId: normalizedContentId,
+    });
+
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error("POST /analytics error:", e);
+    res.status(500).json({ error: "Failed to record event" });
+  }
+});
 
 // ---------------------------------------------------------------------
 // Overview — the top summary cards
@@ -43,6 +126,11 @@ router.get("/admin/analytics/overview", requireAdmin, async (_req, res) => {
       [approvedSubsRow],
       [rejectedSubsRow],
       [notificationsSentRow],
+      [storyPlaysRow],
+      [videoPlaysRow],
+      [downloadsRow],
+      [likesRow],
+      [savesRow],
     ] = await Promise.all([
       db.select({ c: count() }).from(usersTable),
       db.select({ c: count() }).from(usersTable).where(gte(usersTable.createdAt, since7d)),
@@ -58,6 +146,11 @@ router.get("/admin/analytics/overview", requireAdmin, async (_req, res) => {
       db.select({ c: count() }).from(userSubmissionsTable).where(eq(userSubmissionsTable.status, "approved")),
       db.select({ c: count() }).from(userSubmissionsTable).where(eq(userSubmissionsTable.status, "rejected")),
       db.select({ c: count() }).from(scheduledNotificationsTable).where(eq(scheduledNotificationsTable.status, "sent")),
+      db.select({ c: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.eventType, "story_play")),
+      db.select({ c: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.eventType, "video_play")),
+      db.select({ c: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.eventType, "download")),
+      db.select({ c: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.eventType, "like")),
+      db.select({ c: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.eventType, "save")),
     ]);
 
     res.json({
@@ -87,6 +180,13 @@ router.get("/admin/analytics/overview", requireAdmin, async (_req, res) => {
         rejected: rejectedSubsRow?.c ?? 0,
       },
       notificationsSent: notificationsSentRow?.c ?? 0,
+      events: {
+        storyPlays: storyPlaysRow?.c ?? 0,
+        videoPlays: videoPlaysRow?.c ?? 0,
+        downloads: downloadsRow?.c ?? 0,
+        likes: likesRow?.c ?? 0,
+        saves: savesRow?.c ?? 0,
+      },
     });
   } catch (e) {
     console.error("GET /admin/analytics/overview error:", e);
@@ -178,6 +278,120 @@ router.get("/admin/analytics/categories", requireAdmin, async (_req, res) => {
   } catch (e) {
     console.error("GET /admin/analytics/categories error:", e);
     res.status(500).json({ error: "Failed to load category breakdown" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Audio analytics — plays / downloads / likes / saves per story
+// ---------------------------------------------------------------------
+router.get("/admin/analytics/audio", requireAdmin, async (_req, res) => {
+  try {
+    const [stories, playCounts, downloadCounts, likeCounts, saveCounts] = await Promise.all([
+      db.select({ id: audioStoriesTable.id, title: audioStoriesTable.title }).from(audioStoriesTable),
+      db
+        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .from(analyticsEventsTable)
+        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "story_play")))
+        .groupBy(analyticsEventsTable.contentId),
+      db
+        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .from(analyticsEventsTable)
+        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "download")))
+        .groupBy(analyticsEventsTable.contentId),
+      db
+        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .from(analyticsEventsTable)
+        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "like")))
+        .groupBy(analyticsEventsTable.contentId),
+      db
+        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .from(analyticsEventsTable)
+        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "save")))
+        .groupBy(analyticsEventsTable.contentId),
+    ]);
+
+    const playMap = new Map(playCounts.map((r) => [r.contentId, r.c]));
+    const downloadMap = new Map(downloadCounts.map((r) => [r.contentId, r.c]));
+    const likeMap = new Map(likeCounts.map((r) => [r.contentId, r.c]));
+    const saveMap = new Map(saveCounts.map((r) => [r.contentId, r.c]));
+
+    const result = stories
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        plays: playMap.get(s.id) ?? 0,
+        downloads: downloadMap.get(s.id) ?? 0,
+        likes: likeMap.get(s.id) ?? 0,
+        saves: saveMap.get(s.id) ?? 0,
+      }))
+      .sort((a, b) => b.plays - a.plays);
+
+    res.json(result);
+  } catch (e) {
+    console.error("GET /admin/analytics/audio error:", e);
+    res.status(500).json({ error: "Failed to load audio analytics" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Video analytics — views (video_play events) per video
+// ---------------------------------------------------------------------
+router.get("/admin/analytics/videos", requireAdmin, async (_req, res) => {
+  try {
+    const [vids, playCounts] = await Promise.all([
+      db.select({ id: videosTable.id, title: videosTable.title }).from(videosTable),
+      db
+        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .from(analyticsEventsTable)
+        .where(and(eq(analyticsEventsTable.contentType, "video"), eq(analyticsEventsTable.eventType, "video_play")))
+        .groupBy(analyticsEventsTable.contentId),
+    ]);
+
+    const playMap = new Map(playCounts.map((r) => [r.contentId, r.c]));
+
+    const result = vids
+      .map((v) => ({
+        id: v.id,
+        title: v.title,
+        views: playMap.get(v.id) ?? 0,
+      }))
+      .sort((a, b) => b.views - a.views);
+
+    res.json(result);
+  } catch (e) {
+    console.error("GET /admin/analytics/videos error:", e);
+    res.status(500).json({ error: "Failed to load video analytics" });
+  }
+});
+
+// ---------------------------------------------------------------------
+// Downloads dashboard — most downloaded stories
+// ---------------------------------------------------------------------
+router.get("/admin/analytics/downloads", requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+
+    const [stories, downloadCounts] = await Promise.all([
+      db.select({ id: audioStoriesTable.id, title: audioStoriesTable.title }).from(audioStoriesTable),
+      db
+        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .from(analyticsEventsTable)
+        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "download")))
+        .groupBy(analyticsEventsTable.contentId),
+    ]);
+
+    const downloadMap = new Map(downloadCounts.map((r) => [r.contentId, r.c]));
+
+    const result = stories
+      .map((s) => ({ id: s.id, title: s.title, downloads: downloadMap.get(s.id) ?? 0 }))
+      .filter((s) => s.downloads > 0)
+      .sort((a, b) => b.downloads - a.downloads)
+      .slice(0, limit);
+
+    res.json(result);
+  } catch (e) {
+    console.error("GET /admin/analytics/downloads error:", e);
+    res.status(500).json({ error: "Failed to load downloads dashboard" });
   }
 });
 

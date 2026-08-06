@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import { AppState, DeviceEventEmitter } from "react-native";
 import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
+import { trackEvent } from "@/lib/api";
 import React, {
   createContext,
   useCallback,
@@ -236,6 +237,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       await unloadSound();
 
       setCurrentStory(story);
+      trackEvent("story_play", "story", story.id);
 
       AsyncStorage.setItem(
         "last_open_story",
@@ -620,22 +622,26 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const toggleLike = useCallback(
     async (id: string) => {
-      const updated = likedStories.includes(id)
+      const alreadyLiked = likedStories.includes(id);
+      const updated = alreadyLiked
         ? likedStories.filter((s) => s !== id)
         : [...likedStories, id];
       setLikedStories(updated);
       await AsyncStorage.setItem("liked_stories", JSON.stringify(updated)).catch(() => {});
+      if (!alreadyLiked) trackEvent("like", "story", id);
     },
     [likedStories]
   );
 
   const toggleSave = useCallback(
     async (id: string) => {
-      const updated = savedStories.includes(id)
+      const alreadySaved = savedStories.includes(id);
+      const updated = alreadySaved
         ? savedStories.filter((s) => s !== id)
         : [...savedStories, id];
       setSavedStories(updated);
       await AsyncStorage.setItem("saved_stories", JSON.stringify(updated)).catch(() => {});
+      if (!alreadySaved) trackEvent("save", "story", id);
     },
     [savedStories]
   );
