@@ -254,7 +254,7 @@ export default function ProfileScreen() {
 
         {/* Tabs */}
         <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
-          {(["saved", "liked", "history", ...(user && mySubmissions.length > 0 ? ["submissions" as const] : [])]).map((tab) => (
+          {(["saved", "liked", "history", ...(user && mySubmissions.length > 0 ? ["submissions" as const] : [])] as const).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}

@@ -19,6 +19,7 @@ export interface ApiCategory {
   icon: string;
   type: "audio" | "video" | "both";
   slug?: string;
+  active?: boolean;
 }
 
 export interface ApiAudioStory {
