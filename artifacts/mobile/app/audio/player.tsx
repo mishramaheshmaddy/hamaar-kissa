@@ -2,10 +2,11 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Linking,
+  PanResponder,
   Platform,
   ScrollView,
   Share,
@@ -96,6 +97,7 @@ export default function AudioPlayerScreen() {
     togglePlay,
     seekForward,
     seekBackward,
+    seekTo,
     setSpeed,
     likedStories,
     savedStories,
@@ -105,10 +107,68 @@ export default function AudioPlayerScreen() {
   } = useAudio();
   const { user } = useAuth();
   const [showSpeeds, setShowSpeeds] = useState(false);
+  const [dragProgress, setDragProgress] = useState<number | null>(null);
+  const progressBarWidthRef = useRef(0);
+  const draggingProgressRef = useRef(false);
+
   const { addDownload, removeDownload, isDownloaded } = useDownloads();
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [recommended, setRecommended] = useState<AudioStory[]>([]);
   const [moreByNarrator, setMoreByNarrator] = useState<AudioStory[]>([]);
+
+  const displayedProgress = dragProgress ?? progress;
+
+  const updateDragProgress = (locationX: number) => {
+    const width = progressBarWidthRef.current;
+    if (!width) return;
+
+    const next = Math.max(0, Math.min(100, (locationX / width) * 100));
+    setDragProgress(next);
+  };
+
+  const progressPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+
+        onPanResponderGrant: (event) => {
+          draggingProgressRef.current = true;
+          updateDragProgress(event.nativeEvent.locationX);
+        },
+
+        onPanResponderMove: (event) => {
+          updateDragProgress(event.nativeEvent.locationX);
+        },
+
+        onPanResponderRelease: async (event) => {
+          const width = progressBarWidthRef.current;
+
+          if (width > 0 && currentStory) {
+            const next = Math.max(
+              0,
+              Math.min(100, (event.nativeEvent.locationX / width) * 100)
+            );
+
+            setDragProgress(next);
+
+            const targetSeconds =
+              (next / 100) * currentStory.duration;
+
+            await seekTo(targetSeconds);
+          }
+
+          draggingProgressRef.current = false;
+          setDragProgress(null);
+        },
+
+        onPanResponderTerminate: () => {
+          draggingProgressRef.current = false;
+          setDragProgress(null);
+        },
+      }),
+    [currentStory, seekTo]
+  );
 
   useEffect(() => {
     if (!currentStory) {
@@ -397,31 +457,51 @@ async function handleShare() {
           </TouchableOpacity>
         </View>
 
-        {/* Progress Bar */}
+        {/* Draggable Progress Bar */}
         <View style={styles.progressSection}>
-          <View style={[styles.progressBg, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+          <View
+            style={[styles.progressTouchArea]}
+            onLayout={(event) => {
+              progressBarWidthRef.current = event.nativeEvent.layout.width;
+            }}
+            {...progressPanResponder.panHandlers}
+          >
             <View
               style={[
-                styles.progressFill,
-                { width: `${progress}%` as any, backgroundColor: "#fff" },
+                styles.progressBg,
+                { backgroundColor: "rgba(255,255,255,0.2)" },
               ]}
-            />
-            <View
-              style={[
-                styles.progressThumb,
-                {
-                  left: `${Math.min(progress, 97)}%` as any,
-                  backgroundColor: "#fff",
-                  transform: [{ translateX: -8 }],
-                },
-              ]}
-            />
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${displayedProgress}%` as any,
+                    backgroundColor: "#fff",
+                  },
+                ]}
+              />
+
+              <View
+                style={[
+                  styles.progressThumb,
+                  {
+                    left: `${Math.min(displayedProgress, 97)}%` as any,
+                    backgroundColor: "#fff",
+                    transform: [{ translateX: -8 }],
+                  },
+                ]}
+              />
+            </View>
           </View>
+
           <View style={styles.timeRow}>
             <Text style={styles.timeText}>
-              {formatTime(currentStory.duration, progress)}
+              {formatTime(currentStory.duration, displayedProgress)}
             </Text>
-            <Text style={styles.timeText}>{formatTotal(currentStory.duration)}</Text>
+            <Text style={styles.timeText}>
+              {formatTotal(currentStory.duration)}
+            </Text>
           </View>
         </View>
 
@@ -691,7 +771,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textAlignVertical: "center",
   },
-  progressSection: { width: "100%", marginBottom: 32, gap: 8 },
+  progressSection: {
+    width: "100%",
+    marginBottom: 32,
+    gap: 8,
+  },
+  progressTouchArea: {
+    width: "100%",
+    height: 28,
+    justifyContent: "center",
+  },
   progressBg: { height: 5, borderRadius: 3, position: "relative" },
   progressFill: { height: 5, borderRadius: 3, position: "absolute", left: 0, top: 0 },
   progressThumb: { width: 16, height: 16, borderRadius: 8, position: "absolute", top: -6 },

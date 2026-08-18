@@ -2,11 +2,9 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import jwt from "jsonwebtoken";
+import { generateToken } from "./userAuth";
 
 const router = Router();
-
-const JWT_SECRET = process.env["JWT_SECRET"] ?? "hamaar-kissa-secret";
 
 async function getAdmin() {
   const admin = await import("firebase-admin/app");
@@ -57,7 +55,7 @@ router.post("/auth/firebase", async (req, res) => {
       user = inserted[0];
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+    const token = generateToken(user.id);
 
     res.json({
       token,

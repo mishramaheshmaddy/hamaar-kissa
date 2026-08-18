@@ -13,7 +13,7 @@ const GOOGLE_WEB_CLIENT_ID =
   "980779060644-3imt0epjlh3i2ubshu0rj8tsi8do8i8c.apps.googleusercontent.com";
 const googleClient = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
-function generateToken(userId: number): string {
+export function generateToken(userId: number): string {
   return sign({ userId }, JWT_SECRET, { expiresIn: "30d" });
 }
 

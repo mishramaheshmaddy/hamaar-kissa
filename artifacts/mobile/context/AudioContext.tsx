@@ -54,6 +54,7 @@ interface AudioContextType {
   pauseAudio: () => void;
   seekForward: () => void;
   seekBackward: () => void;
+  seekTo: (positionSeconds: number) => Promise<void>;
   setSpeed: (s: number) => void;
   stopPlayer: () => void;
   likedStories: string[];
@@ -586,6 +587,28 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const seekTo = useCallback(async (positionSeconds: number) => {
+    if (!soundRef.current) return;
+
+    try {
+      const status = await soundRef.current.getStatusAsync();
+
+      if (!status.isLoaded) return;
+
+      const duration = status.durationMillis ?? 0;
+      const requested = Math.max(0, positionSeconds * 1000);
+      const newPos = duration > 0
+        ? Math.min(requested, duration)
+        : requested;
+
+      await soundRef.current.setPositionAsync(newPos);
+
+      if (duration > 0) {
+        setProgress((newPos / duration) * 100);
+      }
+    } catch {}
+  }, []);
+
   const setSpeed = useCallback(async (s: number) => {
     setSpeedState(s);
     await AsyncStorage.setItem("audio_speed", String(s)).catch(() => {});
@@ -693,6 +716,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         pauseAudio,
         seekForward,
         seekBackward,
+        seekTo,
         setSpeed,
         toggleShuffle,
         toggleRepeat,
