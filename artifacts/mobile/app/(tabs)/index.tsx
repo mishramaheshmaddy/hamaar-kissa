@@ -219,7 +219,14 @@ export default function HomeScreen() {
                 : "";
               return (
                 <TouchableOpacity
-                  onPress={() => router.push(`/video/${item.id}` as any)}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(tabs)/video",
+                      params: {
+                        selectedVideoId: String(item.id),
+                      },
+                    } as any)
+                  }
                   style={[styles.videoThumb, { backgroundColor: "#1C1208" }]}
                 >
                   {thumb ? (

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAudio } from "@/context/AudioContext";
 import {
   ActivityIndicator,
@@ -56,6 +56,10 @@ function mapVideo(v: ApiVideo, catName: string): VideoItem {
 }
 
 export default function VideoScreen() {
+  const { selectedVideoId } = useLocalSearchParams<{
+    selectedVideoId?: string;
+  }>();
+
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -85,19 +89,11 @@ export default function VideoScreen() {
   useFocusEffect(
     useCallback(() => {
       pauseAudio();
-      if (filteredVideos.length > 0) {
-        setFeedItems(shuffleArray(filteredVideos));
-        setActiveIndex(0);
-        requestAnimationFrame(() => {
-          flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-        });
-      }
 
       return () => {
-        // Leaving Video tab
         setActiveIndex(-1);
       };
-    }, [pauseAudio, filteredVideos])
+    }, [pauseAudio])
   );
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -163,10 +159,42 @@ export default function VideoScreen() {
   const MAX_FEED_LENGTH = 300; // sane cap so memory doesn't grow forever in one long session
 
   useEffect(() => {
+    if (filteredVideos.length === 0) {
+      setFeedItems([]);
+      return;
+    }
+
+    const selectedId = selectedVideoId
+      ? String(selectedVideoId)
+      : null;
+
+    if (selectedId) {
+      const selected = filteredVideos.find(
+        (video) => String(video.id) === selectedId
+      );
+
+      if (selected) {
+        const remaining = filteredVideos.filter(
+          (video) => String(video.id) !== selectedId
+        );
+
+        setFeedItems([selected, ...shuffleArray(remaining)]);
+        setActiveIndex(0);
+
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToOffset({
+            offset: 0,
+            animated: false,
+          });
+        });
+
+        return;
+      }
+    }
+
     setFeedItems(shuffleArray(filteredVideos));
     setActiveIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, videos]);
+  }, [filteredVideos, selectedVideoId]);
 
   const appendRandomBatch = useCallback(() => {
     if (filteredVideos.length === 0) return;
