@@ -26,6 +26,14 @@ export function verifyUserToken(token: string): { userId: number } | null {
   }
 }
 
+function normalizePhone(value: string): string {
+  return value.replace(/\D/g, "").slice(-10);
+}
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function parseProfileDate(value: string): Date | null {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -133,14 +141,25 @@ router.post("/auth/verify-otp", async (req, res) => {
 
   await db.update(otpVerificationsTable).set({ isUsed: true }).where(eq(otpVerificationsTable.id, record.id));
 
-  let [user] = await db.select().from(usersTable).where(eq(usersTable.phone, phone));
+  const normalizedPhone = normalizePhone(phone);
+
+  // Always use the existing account when this phone number
+  // is already linked to one.
+  let [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.phone, normalizedPhone))
+    .limit(1);
+
   const isNewUser = !user;
+
   if (!user) {
     const [newUser] = await db.insert(usersTable).values({
-      phone,
+      phone: normalizedPhone,
       name: "",
       authProvider: "phone",
     }).returning();
+
     user = newUser;
   }
 
@@ -164,18 +183,29 @@ router.post("/auth/google", async (req, res) => {
     });
     const payload = ticket.getPayload();
     const googleId = payload?.sub;
-    const email = payload?.email ?? null;
+    const email = payload?.email
+      ? normalizeEmail(payload.email)
+      : null;
 
     if (!googleId || !email || payload?.email_verified !== true) {
       res.status(401).json({ error: "Google account could not be verified" });
       return;
     }
 
+    // Match an existing account by Google ID OR email.
+    // This prevents a duplicate account when an existing
+    // phone account later has the same email added.
     let [user] = await db
       .select()
       .from(usersTable)
-      .where(or(eq(usersTable.googleId, googleId), eq(usersTable.email, email)))
+      .where(
+        or(
+          eq(usersTable.googleId, googleId),
+          eq(usersTable.email, email)
+        )
+      )
       .limit(1);
+
     const isNewUser = !user;
 
     if (!user) {
@@ -187,10 +217,13 @@ router.post("/auth/google", async (req, res) => {
         googleId,
       }).returning();
     } else {
+      // Keep the existing user.id.
+      // We are attaching Google authentication to the
+      // existing account rather than creating another user.
       [user] = await db.update(usersTable).set({
         googleId,
         name: payload.name || user.name,
-        email,
+        email: user.email || email,
         avatarUrl: payload.picture || user.avatarUrl,
         authProvider: "google",
         updatedAt: new Date(),
@@ -311,30 +344,57 @@ router.put("/auth/profile", async (req, res) => {
     return;
   }
 
+  const normalizedPhone =
+    phone !== undefined && phone !== null && phone.trim() !== ""
+      ? normalizePhone(phone)
+      : undefined;
+
+  const normalizedEmail =
+    email !== undefined && email !== null && email.trim() !== ""
+      ? normalizeEmail(email)
+      : undefined;
+
+  // Do not allow an identifier already belonging to
+  // another user to be attached to this account.
+  if (normalizedPhone) {
+    const [phoneOwner] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.phone, normalizedPhone))
+      .limit(1);
+
+    if (phoneOwner && phoneOwner.id !== decoded.userId) {
+      res.status(409).json({
+        error: "This phone number is already linked to another account",
+      });
+      return;
+    }
+  }
+
+  if (normalizedEmail) {
+    const [emailOwner] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, normalizedEmail))
+      .limit(1);
+
+    if (emailOwner && emailOwner.id !== decoded.userId) {
+      res.status(409).json({
+        error: "This email is already linked to another account",
+      });
+      return;
+    }
+  }
+
   const [user]=await db.update(usersTable).set({
-
     name:name ?? undefined,
-
     avatarUrl:avatarUrl ?? undefined,
-
     username:username ?? undefined,
-
     dateOfBirth:parsedDateOfBirth,
-
     age:age ?? undefined,
-
-    phone:
-      current.authProvider==="phone"
-        ? undefined
-        : (phone ?? undefined),
-
-    email:
-      current.authProvider==="google"
-        ? undefined
-        : (email ?? undefined),
-
+    phone:normalizedPhone ?? undefined,
+    email:normalizedEmail ?? undefined,
     updatedAt:new Date(),
-
   })
   .where(eq(usersTable.id,decoded.userId))
   .returning();
