@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
+import { addToPlaylist, getPlaylists, ApiPlaylist } from "@/lib/api";
 import { CATEGORY_GRADIENTS } from "./CategoryColors";
 
 interface AudioCardProps {
@@ -134,6 +135,58 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
   const { isDownloaded, addDownload, removeDownload } = useDownloads();
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+
+  const [playlistPickerVisible, setPlaylistPickerVisible] = useState(false);
+  const [playlists, setPlaylists] = useState<ApiPlaylist[]>([]);
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
+
+  const openPlaylistPicker = () => requireLogin(async () => {
+    setPlaylistLoading(true);
+    setSelectedPlaylistIds([]);
+
+    try {
+      const rows = await getPlaylists();
+      setPlaylists(rows);
+      setPlaylistPickerVisible(true);
+    } catch (e) {
+      console.error("Playlist load error:", e);
+      Alert.alert("Error", "Playlist लोड ना हो पावल।");
+    } finally {
+      setPlaylistLoading(false);
+    }
+  });
+
+  const togglePlaylistSelection = (playlistId: number) => {
+    setSelectedPlaylistIds((current) =>
+      current.includes(playlistId)
+        ? current.filter((id) => id !== playlistId)
+        : [...current, playlistId]
+    );
+  };
+
+  const confirmAddToPlaylists = async () => {
+    if (selectedPlaylistIds.length === 0) {
+      Alert.alert("ध्यान दीं", "कम से कम एगो playlist चुनल जरूरी बा।");
+      return;
+    }
+
+    try {
+      await Promise.all(
+        selectedPlaylistIds.map((playlistId) =>
+          addToPlaylist(playlistId, Number(story.id))
+        )
+      );
+
+      setPlaylistPickerVisible(false);
+      setSelectedPlaylistIds([]);
+
+      Alert.alert("✅", "कहानी playlist में जोड़ दिहल गइल।");
+    } catch (e) {
+      console.error("Add to playlist error:", e);
+      Alert.alert("Error", "कहानी playlist में ना जुड़ पावल।");
+    }
+  };
   const downloaded = isDownloaded(story.id);
 
   const offlineBadge = downloaded ? (
@@ -297,6 +350,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
   }
 
   return (
+    <>
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
@@ -357,6 +411,12 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
               <Feather name="download" size={14} color={colors.mutedForeground} />
             )}
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={openPlaylistPicker}
+            style={styles.actionBtn}
+          >
+            <Feather name="plus" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
@@ -372,6 +432,163 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
         </View>
       </View>
     </TouchableOpacity>
+
+    {playlistPickerVisible && (
+      <View style={styles.playlistModalOverlay}>
+        <View
+          style={[
+            styles.playlistModal,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <View style={styles.playlistModalHeader}>
+            <Text
+              style={[
+                styles.playlistModalTitle,
+                { color: colors.foreground },
+              ]}
+            >
+              हमार playlist में जोड़ें
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => {
+                setPlaylistPickerVisible(false);
+                setSelectedPlaylistIds([]);
+              }}
+              style={styles.playlistCloseButton}
+            >
+              <Feather
+                name="x"
+                size={20}
+                color={colors.mutedForeground}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {playlistLoading ? (
+            <View style={styles.playlistLoading}>
+              <Text
+                style={[
+                  styles.playlistLoadingText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                Playlist लोड हो रहल बा...
+              </Text>
+            </View>
+          ) : playlists.length === 0 ? (
+            <View style={styles.playlistEmpty}>
+              <Feather
+                name="list"
+                size={40}
+                color={colors.mutedForeground}
+              />
+              <Text
+                style={[
+                  styles.playlistEmptyText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                अभी कवनो playlist नइखे।
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.playlistList}>
+              {playlists.map((playlist) => {
+                const checked = selectedPlaylistIds.includes(playlist.id);
+
+                return (
+                  <TouchableOpacity
+                    key={playlist.id}
+                    onPress={() => togglePlaylistSelection(playlist.id)}
+                    style={[
+                      styles.playlistOption,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: checked
+                          ? colors.secondary
+                          : "transparent",
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.playlistCheckbox,
+                        {
+                          borderColor: checked
+                            ? colors.primary
+                            : colors.mutedForeground,
+                          backgroundColor: checked
+                            ? colors.primary
+                            : "transparent",
+                        },
+                      ]}
+                    >
+                      {checked && (
+                        <Feather
+                          name="check"
+                          size={14}
+                          color="#fff"
+                        />
+                      )}
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.playlistOptionText,
+                        { color: colors.foreground },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {playlist.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {playlists.length > 0 && (
+            <View style={styles.playlistModalActions}>
+              <TouchableOpacity
+                onPress={() => {
+                  setPlaylistPickerVisible(false);
+                  setSelectedPlaylistIds([]);
+                }}
+                style={styles.playlistCancelButton}
+              >
+                <Text
+                  style={[
+                    styles.playlistCancelText,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  रद्द
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={confirmAddToPlaylists}
+                style={[
+                  styles.playlistAddButton,
+                  { backgroundColor: colors.primary },
+                ]}
+              >
+                <Text style={styles.playlistAddText}>
+                  जोड़ें
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    )}
+
+    </>
   );
 }
 
@@ -447,4 +664,116 @@ const styles = StyleSheet.create({
   compactMeta: { fontSize: 12 },
   compactActions: { flexDirection: "row", alignItems: "center", gap: 4 },
   compactPlay: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+
+  playlistModalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  playlistModal: {
+    width: "88%",
+    maxWidth: 380,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  playlistModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  playlistModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    flex: 1,
+  },
+  playlistCloseButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playlistLoading: {
+    paddingVertical: 28,
+    alignItems: "center",
+  },
+  playlistLoadingText: {
+    fontSize: 14,
+  },
+  playlistEmpty: {
+    paddingVertical: 28,
+    alignItems: "center",
+    gap: 10,
+  },
+  playlistEmptyText: {
+    fontSize: 14,
+    textAlign: "center",
+  },
+  playlistList: {
+    gap: 8,
+    maxHeight: 260,
+  },
+  playlistOption: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+  playlistCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  playlistOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  playlistModalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 16,
+  },
+  playlistCancelButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  playlistCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  playlistAddButton: {
+    minWidth: 80,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  playlistAddText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
 });
