@@ -9,3 +9,5 @@ export * from "./pushTokens";
 export * from "./notificationSettings";
 export * from "./scheduledNotifications";
 export * from "./analyticsEvents";
+
+export * from "./playlists";

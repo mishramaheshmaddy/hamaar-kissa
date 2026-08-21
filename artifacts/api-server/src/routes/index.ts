@@ -15,6 +15,7 @@ import searchRouter from "./search";
 import pushTokensRouter from "./pushTokens";
 import notificationsRouter from "./notifications";
 import analyticsRouter from "./analytics";
+import playlistsRouter from "./playlists";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(searchRouter);
 router.use(pushTokensRouter);
 router.use(notificationsRouter);
 router.use(analyticsRouter);
+router.use(playlistsRouter);
 
 export default router;
