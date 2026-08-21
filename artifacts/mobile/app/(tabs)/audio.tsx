@@ -118,12 +118,25 @@ export default function AudioScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPadding + 12, backgroundColor: colors.background }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>सुनल के कहानी</Text>
-        <TouchableOpacity
-          style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
-          onPress={() => router.push("/search" as any)}
-        >
-          <Feather name="search" size={20} color={colors.foreground} />
-        </TouchableOpacity>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.playlistButton}
+            onPress={() => router.push("/playlists" as any)}
+          >
+            <Feather name="list" size={18} color={colors.primary} />
+            <Text style={[styles.playlistButtonText, { color: colors.primary }]}>
+              हमार playlist
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
+            onPress={() => router.push("/search" as any)}
+          >
+            <Feather name="search" size={20} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
@@ -240,6 +253,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  playlistButton: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 8, borderRadius: 18 },
+  playlistButtonText: { fontSize: 12, fontWeight: "700", marginLeft: 5 },
   tabs: { flexDirection: "row", borderBottomWidth: 1, marginHorizontal: 16, marginBottom: 4 },
   tab: { paddingVertical: 10, paddingHorizontal: 16 },
   tabText: { fontSize: 14 },

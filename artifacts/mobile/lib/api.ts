@@ -96,3 +96,141 @@ export function trackEvent(
     }
   })();
 }
+// ---------------------------------------------------------------------
+// Playlist API
+// ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Playlist API
+// ---------------------------------------------------------------------
+
+export interface ApiPlaylist {
+  id: number;
+  userId: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiPlaylistItem {
+  itemId: number;
+  position: number;
+  story: ApiAudioStory;
+}
+
+export interface ApiPlaylistWithItems extends ApiPlaylist {
+  items: ApiPlaylistItem[];
+}
+
+async function authenticatedFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = await AsyncStorage.getItem("hk_token");
+
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  const headers = new Headers(options.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+
+  if (options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("AUTH_REQUIRED");
+    }
+
+    let message = `API error ${res.status}`;
+
+    try {
+      const data = await res.json();
+      if (data?.error) {
+        message = data.error;
+      }
+    } catch {
+      // Keep the generic API error.
+    }
+
+    throw new Error(message);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = res.headers.get("content-type");
+
+  if (!contentType || !contentType.includes("application/json")) {
+    const responseText = await res.text();
+    throw new Error(
+      `API returned non-JSON: ${responseText.slice(0, 200)}`,
+    );
+  }
+
+  return res.json() as Promise<T>;
+}
+
+export async function getPlaylists(): Promise<ApiPlaylist[]> {
+  return authenticatedFetch<ApiPlaylist[]>("/api/playlists");
+}
+
+export async function createPlaylist(
+  name: string,
+): Promise<ApiPlaylist> {
+  return authenticatedFetch<ApiPlaylist>("/api/playlists", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function getPlaylist(
+  playlistId: number,
+): Promise<ApiPlaylistWithItems> {
+  return authenticatedFetch<ApiPlaylistWithItems>(
+    `/api/playlists/${playlistId}`,
+  );
+}
+
+export async function addToPlaylist(
+  playlistId: number,
+  audioStoryId: number,
+): Promise<ApiPlaylistItem> {
+  return authenticatedFetch<ApiPlaylistItem>(
+    `/api/playlists/${playlistId}/items`,
+    {
+      method: "POST",
+      body: JSON.stringify({ audioStoryId }),
+    },
+  );
+}
+
+export async function removeFromPlaylist(
+  playlistId: number,
+  itemId: number,
+): Promise<void> {
+  await authenticatedFetch<void>(
+    `/api/playlists/${playlistId}/items/${itemId}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export async function deletePlaylist(
+  playlistId: number,
+): Promise<void> {
+  await authenticatedFetch<void>(
+    `/api/playlists/${playlistId}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
