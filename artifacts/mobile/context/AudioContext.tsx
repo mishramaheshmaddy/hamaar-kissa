@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
-import { AppState, DeviceEventEmitter } from "react-native";
+import { Alert, AppState, DeviceEventEmitter } from "react-native";
 import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
 import { apiFetch, trackEvent, ApiAudioStory } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "expo-router";
 import React, {
   createContext,
   useCallback,
@@ -73,6 +75,15 @@ interface AudioContextType {
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // Guest listening gate:
+  // A guest can listen to 2 unique audio stories. The 3rd unique story
+  // requires login. Replaying an already-played story does not consume
+  // another guest slot.
+  const guestPlayedAudioIdsRef = useRef<Set<string>>(new Set());
+
   const [currentStory, setCurrentStory] = useState<AudioStory | null>(null);
   const [queue, setQueue] = useState<AudioStory[]>([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState(-1);
@@ -299,6 +310,30 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const playStory = useCallback(
     async (story: AudioStory) => {
+      const storyId = String(story.id);
+
+      if (!user && !guestPlayedAudioIdsRef.current.has(storyId)) {
+        if (guestPlayedAudioIdsRef.current.size >= 2) {
+          Alert.alert(
+            "लॉगिन करीं 🙏",
+            "अगला कहानी सुनें खातिर लॉगिन करीं",
+            [
+              {
+                text: "बाद में",
+                style: "cancel",
+              },
+              {
+                text: "लॉगिन करीं",
+                onPress: () => router.push("/login"),
+              },
+            ]
+          );
+          return;
+        }
+
+        guestPlayedAudioIdsRef.current.add(storyId);
+      }
+
       DeviceEventEmitter.emit("STOP_ALL_VIDEOS");
       await unloadSound();
 
@@ -483,7 +518,16 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(false);
       }
     },
-    [history, speed, unloadSound, shuffle, repeatMode, queue]
+    [
+      history,
+      speed,
+      unloadSound,
+      shuffle,
+      repeatMode,
+      queue,
+      user,
+      router,
+    ]
   );
 
   playStoryRef.current = playStory;

@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useAudio } from "@/context/AudioContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   AppStateStatus,
   Dimensions,
@@ -62,9 +64,16 @@ export default function VideoScreen() {
 
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user } = useAuth();
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<number | "all">("all");
   const { pauseAudio } = useAudio();
+
+  // Guest video gate:
+  // A guest can view 5 unique videos. The 6th unique video requires login.
+  // Repeated videos do not consume another guest slot.
+  const guestSeenVideoIdsRef = useRef<Set<string>>(new Set());
 
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -210,11 +219,53 @@ export default function VideoScreen() {
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setActiveIndex(viewableItems[0].index);
+      if (viewableItems.length === 0 || viewableItems[0].index === null) {
+        return;
       }
+
+      const nextIndex = viewableItems[0].index;
+      const nextVideo = feedItems[nextIndex];
+
+      if (!nextVideo) {
+        return;
+      }
+
+      const videoId = String(nextVideo.id);
+
+      if (!user && !guestSeenVideoIdsRef.current.has(videoId)) {
+        if (guestSeenVideoIdsRef.current.size >= 5) {
+          Alert.alert(
+            "लॉगिन करीं 🙏",
+            "अगला वीडियो देखें खातिर लॉगिन करीं",
+            [
+              {
+                text: "बाद में",
+                style: "cancel",
+              },
+              {
+                text: "लॉगिन करीं",
+                onPress: () => router.push("/login"),
+              },
+            ]
+          );
+
+          requestAnimationFrame(() => {
+            const safeIndex = Math.max(0, activeIndex);
+            flatListRef.current?.scrollToIndex({
+              index: safeIndex,
+              animated: true,
+            });
+          });
+
+          return;
+        }
+
+        guestSeenVideoIdsRef.current.add(videoId);
+      }
+
+      setActiveIndex(nextIndex);
     },
-    []
+    [feedItems, user, router, activeIndex]
   );
 
   return (

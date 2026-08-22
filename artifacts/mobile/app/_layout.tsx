@@ -117,15 +117,15 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
-            <AudioProvider>
-              <AuthProvider>
+            <AuthProvider>
+              <AudioProvider>
                 <GestureHandlerRootView>
                   <KeyboardProvider>
                     <RootLayoutNav />
                   </KeyboardProvider>
                 </GestureHandlerRootView>
-              </AuthProvider>
-            </AudioProvider>
+              </AudioProvider>
+            </AuthProvider>
           </QueryClientProvider>
         </ErrorBoundary>
       </SafeAreaProvider>
