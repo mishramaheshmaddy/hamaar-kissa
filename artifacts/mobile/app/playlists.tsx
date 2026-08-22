@@ -364,6 +364,17 @@ export default function PlaylistsScreen() {
               >
                 सुनीं page से कहानी playlist में जोड़ सकत बानी।
               </Text>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/audio")}
+                style={[
+                  styles.emptyAddButton,
+                  { backgroundColor: colors.primary },
+                ]}
+                accessibilityLabel="कहानी जोड़ें"
+              >
+                <Feather name="plus" size={32} color="#fff" />
+              </TouchableOpacity>
             </View>
           }
         />
@@ -685,6 +696,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 7,
     textAlign: "center",
+  },
+  emptyAddButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
   },
   modalOverlay: {
     flex: 1,
