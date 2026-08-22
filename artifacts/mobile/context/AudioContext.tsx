@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import { AppState, DeviceEventEmitter } from "react-native";
 import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
-import { trackEvent } from "@/lib/api";
+import { apiFetch, trackEvent, ApiAudioStory } from "@/lib/api";
 import React, {
   createContext,
   useCallback,
@@ -232,6 +232,71 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     [stopPlayer]
   );
 
+  const playStoryRef = useRef<(story: AudioStory) => Promise<void>>(async () => {});
+
+  const playRandomNextStory = useCallback(
+    async (finishedStoryId: string) => {
+      try {
+        const rows = await apiFetch<ApiAudioStory[]>(
+          "/api/audio-stories?published=true"
+        );
+
+        const available = rows.filter(
+          (item) => String(item.id) !== String(finishedStoryId)
+        );
+
+        if (available.length === 0) {
+          console.log("No other audio available for autoplay.");
+          setIsPlaying(false);
+          return;
+        }
+
+        let next: ApiAudioStory;
+
+        if (shuffle) {
+          next =
+            available[Math.floor(Math.random() * available.length)];
+        } else {
+          const currentIndex = rows.findIndex(
+            (item) => String(item.id) === String(finishedStoryId)
+          );
+
+          const nextIndex =
+            currentIndex >= 0
+              ? (currentIndex + 1) % rows.length
+              : 0;
+
+          next =
+            rows[nextIndex] &&
+            String(rows[nextIndex].id) !== String(finishedStoryId)
+              ? rows[nextIndex]
+              : available[0];
+        }
+
+        const nextStory: AudioStory = {
+          id: String(next.id),
+          title: next.title,
+          category: next.categoryName ?? "",
+          categoryId: next.categoryId ?? undefined,
+          categoryName: next.categoryName,
+          duration: next.durationSeconds,
+          thumbnail: next.thumbnailUrl ?? "",
+          narrator: next.narrator,
+          description: next.description,
+          audioUrl: next.audioUrl,
+        };
+
+        console.log("▶️ Auto-playing next audio:", nextStory.title);
+
+        await playStoryRef.current(nextStory);
+      } catch (error) {
+        console.error("AUTO NEXT AUDIO ERROR:", error);
+        setIsPlaying(false);
+      }
+    },
+    [shuffle]
+  );
+
   const playStory = useCallback(
     async (story: AudioStory) => {
       DeviceEventEmitter.emit("STOP_ALL_VIDEOS");
@@ -357,6 +422,14 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
                     return 0;
                   }
 
+                  // No queued item: normal standalone audio should
+                  // continue automatically with another published story.
+                  if (queue.length === 0) {
+                    playRandomNextStory(story.id);
+                    return index;
+                  }
+
+                  // An explicit finite queue has finished.
                   setIsPlaying(false);
                   return index;
                 });
@@ -413,6 +486,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     [history, speed, unloadSound, shuffle, repeatMode, queue]
   );
 
+  playStoryRef.current = playStory;
 
   const addToQueue = useCallback((story: AudioStory) => {
     setQueue((prev) => {
