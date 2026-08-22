@@ -455,12 +455,7 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
               <Feather name="download" size={14} color={colors.mutedForeground} />
             )}
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={openPlaylistPicker}
-            style={styles.actionBtn}
-          >
-            <Feather name="plus" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
+
         </View>
 
         <View style={styles.footer}>

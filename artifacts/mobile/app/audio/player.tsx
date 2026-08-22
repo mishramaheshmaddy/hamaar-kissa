@@ -231,6 +231,19 @@ export default function AudioPlayerScreen() {
     action();
   };
 
+  const handleAddToPlaylist = () => {
+    if (!currentStory) return;
+
+    requireLogin(() => {
+      router.push({
+        pathname: "/playlists" as any,
+        params: {
+          addStoryId: String(currentStory.id),
+        },
+      });
+    });
+  };
+
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -437,6 +450,14 @@ async function handleShare() {
           <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
             <Feather name="share-2" size={26} color="#fff" />
             <Text style={styles.actionLabel}>शेयर</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleAddToPlaylist}
+            style={styles.actionBtn}
+          >
+            <Feather name="plus" size={26} color="#fff" />
+            <Text style={styles.actionLabel}>प्लेलिस्ट</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleDownload} style={styles.actionBtn} disabled={isDownloading}>

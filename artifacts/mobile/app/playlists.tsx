@@ -31,7 +31,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function PlaylistsScreen() {
   const colors = useColors();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    addStoryId?: string;
+  }>();
   const [playlists, setPlaylists] = useState<ApiPlaylist[]>([]);
   const [playlist, setPlaylist] = useState<ApiPlaylistWithItems | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +43,11 @@ export default function PlaylistsScreen() {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
+
   const playlistId = params.id ? Number(params.id) : null;
+  const addStoryId = params.addStoryId ? Number(params.addStoryId) : null;
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +57,27 @@ export default function PlaylistsScreen() {
       } else {
         const data = await getPlaylists();
         setPlaylists(data);
+
+        if (addStoryId) {
+          if (data.length === 0) {
+            // CASE 1:
+            // User wants to add the current audio but has no playlist.
+            // Open the existing create-playlist popup.
+            setSelectMode(false);
+            setSelectedPlaylistIds([]);
+            setShowCreate(true);
+          } else {
+            // CASE 2:
+            // User already has playlists.
+            // Show playlist selection mode.
+            setSelectMode(true);
+            setSelectedPlaylistIds([]);
+            setShowCreate(false);
+          }
+        } else {
+          setSelectMode(false);
+          setSelectedPlaylistIds([]);
+        }
       }
     } catch (error) {
       if (error instanceof Error && error.message === "AUTH_REQUIRED") {
@@ -71,7 +99,7 @@ export default function PlaylistsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [playlistId]);
+  }, [playlistId, addStoryId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,13 +122,68 @@ export default function PlaylistsScreen() {
 
     try {
       setSaving(true);
-      await createPlaylist(trimmed);
+
+      const created = await createPlaylist(trimmed);
+
+      // If this page was opened from the player with a story,
+      // automatically add that story to the newly created playlist.
+      if (addStoryId) {
+        await addToPlaylist(created.id, addStoryId);
+      }
+
       setName("");
       setShowCreate(false);
+
+      if (addStoryId) {
+        // Return directly to the player.
+        router.back();
+        return;
+      }
+
       await load();
     } catch (error) {
       Alert.alert(
         "Playlist ना बन पवल",
+        error instanceof Error ? error.message : "फिर से कोशिश करीं।",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const togglePlaylistSelection = (playlistId: number) => {
+    setSelectedPlaylistIds((current) =>
+      current.includes(playlistId)
+        ? current.filter((id) => id !== playlistId)
+        : [...current, playlistId],
+    );
+  };
+
+  const handleAddSelected = async () => {
+    if (!addStoryId) return;
+
+    if (selectedPlaylistIds.length === 0) {
+      Alert.alert(
+        "ध्यान दीं",
+        "कम से कम एगो playlist चुनल जरूरी बा।",
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      await Promise.all(
+        selectedPlaylistIds.map((playlistId) =>
+          addToPlaylist(playlistId, addStoryId),
+        ),
+      );
+
+      // Return to the player after adding.
+      router.back();
+    } catch (error) {
+      Alert.alert(
+        "कहानी ना जुड़ पवल",
         error instanceof Error ? error.message : "फिर से कोशिश करीं।",
       );
     } finally {
