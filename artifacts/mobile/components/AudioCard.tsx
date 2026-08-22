@@ -10,6 +10,9 @@ import {
   View,
   Share,
   Alert,
+  Modal,
+  Pressable,
+  TextInput,
   Platform,
   StyleProp,
   ViewStyle,
@@ -22,7 +25,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
-import { addToPlaylist, getPlaylists, ApiPlaylist } from "@/lib/api";
+import { addToPlaylist, createPlaylist, getPlaylists, ApiPlaylist } from "@/lib/api";
 import { CATEGORY_GRADIENTS } from "./CategoryColors";
 
 interface AudioCardProps {
@@ -141,6 +144,10 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<number[]>([]);
   const [playlistLoading, setPlaylistLoading] = useState(false);
 
+  const [createPlaylistVisible, setCreatePlaylistVisible] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
+
   const openPlaylistPicker = () => requireLogin(async () => {
     setPlaylistLoading(true);
     setSelectedPlaylistIds([]);
@@ -163,6 +170,43 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
         ? current.filter((id) => id !== playlistId)
         : [...current, playlistId]
     );
+  };
+
+  const handleCreatePlaylist = async () => {
+    const trimmed = newPlaylistName.trim();
+
+    if (!trimmed) {
+      Alert.alert("नाम दीं", "Playlist के एगो नाम दीं।");
+      return;
+    }
+
+    try {
+      setCreatingPlaylist(true);
+
+      const created = await createPlaylist(trimmed);
+
+      // नया playlist बनते ही ई कहानी ओहमें जोड़ दीं।
+      await addToPlaylist(created.id, Number(story.id));
+
+      setPlaylists((current) => [created, ...current]);
+      setNewPlaylistName("");
+      setCreatePlaylistVisible(false);
+      setPlaylistPickerVisible(false);
+      setSelectedPlaylistIds([]);
+
+      Alert.alert(
+        "✅",
+        `"${created.name}" playlist बन गइल आ कहानी जोड़ दिहल गइल।`
+      );
+    } catch (e) {
+      console.error("Create playlist error:", e);
+      Alert.alert(
+        "Playlist ना बन पवल",
+        e instanceof Error ? e.message : "फिर से कोशिश करीं।"
+      );
+    } finally {
+      setCreatingPlaylist(false);
+    }
   };
 
   const confirmAddToPlaylists = async () => {
@@ -487,14 +531,37 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
                 size={40}
                 color={colors.mutedForeground}
               />
+
               <Text
                 style={[
                   styles.playlistEmptyText,
+                  { color: colors.foreground },
+                ]}
+              >
+                अभी कवनो playlist नइखे
+              </Text>
+
+              <Text
+                style={[
+                  styles.playlistEmptySubtext,
                   { color: colors.mutedForeground },
                 ]}
               >
-                अभी कवनो playlist नइखे।
+                पहिले एगो playlist बनाईं
               </Text>
+
+              <TouchableOpacity
+                onPress={() => setCreatePlaylistVisible(true)}
+                style={[
+                  styles.createPlaylistButton,
+                  { backgroundColor: colors.primary },
+                ]}
+              >
+                <Feather name="plus" size={17} color="#fff" />
+                <Text style={styles.createPlaylistButtonText}>
+                  Playlist बनाईं
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.playlistList}>
@@ -588,6 +655,108 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
       </View>
     )}
 
+
+    <Modal
+      visible={createPlaylistVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        if (!creatingPlaylist) {
+          setCreatePlaylistVisible(false);
+        }
+      }}
+    >
+      <Pressable
+        style={styles.createPlaylistOverlay}
+        onPress={() => {
+          if (!creatingPlaylist) {
+            setCreatePlaylistVisible(false);
+          }
+        }}
+      >
+        <Pressable
+          style={[
+            styles.createPlaylistModal,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={(event) => event.stopPropagation()}
+        >
+          <Text
+            style={[
+              styles.createPlaylistTitle,
+              { color: colors.foreground },
+            ]}
+          >
+            नया playlist बनाईं
+          </Text>
+
+          <Text
+            style={[
+              styles.createPlaylistSubtitle,
+              { color: colors.mutedForeground },
+            ]}
+          >
+            अपना playlist के एगो नाम दीं
+          </Text>
+
+          <TextInput
+            value={newPlaylistName}
+            onChangeText={setNewPlaylistName}
+            placeholder="जइसे — रात के कहानी"
+            placeholderTextColor={colors.mutedForeground}
+            autoFocus
+            maxLength={60}
+            editable={!creatingPlaylist}
+            style={[
+              styles.createPlaylistInput,
+              {
+                color: colors.foreground,
+                borderColor: colors.border,
+                backgroundColor: colors.secondary,
+              },
+            ]}
+            onSubmitEditing={handleCreatePlaylist}
+          />
+
+          <View style={styles.createPlaylistActions}>
+            <TouchableOpacity
+              onPress={() => {
+                if (creatingPlaylist) return;
+                setNewPlaylistName("");
+                setCreatePlaylistVisible(false);
+              }}
+              style={styles.createPlaylistCancel}
+            >
+              <Text
+                style={[
+                  styles.createPlaylistCancelText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                रद्द करीं
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleCreatePlaylist}
+              disabled={creatingPlaylist}
+              style={[
+                styles.createPlaylistConfirm,
+                { backgroundColor: colors.primary },
+              ]}
+            >
+              <Text style={styles.createPlaylistConfirmText}>
+                {creatingPlaylist ? "बन रहल बा..." : "बनाईं"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+
     </>
   );
 }
@@ -664,6 +833,103 @@ const styles = StyleSheet.create({
   compactMeta: { fontSize: 12 },
   compactActions: { flexDirection: "row", alignItems: "center", gap: 4 },
   compactPlay: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+
+  playlistEmptySubtext: {
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: -4,
+  },
+
+  createPlaylistButton: {
+    minHeight: 42,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 4,
+  },
+
+  createPlaylistButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  createPlaylistOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  createPlaylistModal: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 20,
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+
+  createPlaylistTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+  },
+
+  createPlaylistSubtitle: {
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+
+  createPlaylistInput: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+
+  createPlaylistActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 16,
+  },
+
+  createPlaylistCancel: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  createPlaylistCancelText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  createPlaylistConfirm: {
+    minWidth: 80,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+
+  createPlaylistConfirmText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
 
   playlistModalOverlay: {
     position: "absolute",
