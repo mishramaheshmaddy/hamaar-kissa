@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -23,7 +23,7 @@ import { useColors } from "@/hooks/useColors";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
-import { apiFetch, ApiAudioStory, trackEvent } from "@/lib/api";
+import { apiFetch, ApiAudioStory, getPlaylist, getPlaylists, trackEvent } from "@/lib/api";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
@@ -113,10 +113,61 @@ export default function AudioPlayerScreen() {
 
   const { addDownload, removeDownload, isDownloaded } = useDownloads();
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [isInPlaylist, setIsInPlaylist] = useState(false);
+  const [playlistChecking, setPlaylistChecking] = useState(false);
   const [recommended, setRecommended] = useState<AudioStory[]>([]);
   const [moreByNarrator, setMoreByNarrator] = useState<AudioStory[]>([]);
 
   const displayedProgress = dragProgress ?? progress;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkPlaylistMembership = async () => {
+      if (!user || !currentStory) {
+        setIsInPlaylist(false);
+        setPlaylistChecking(false);
+        return;
+      }
+
+      setPlaylistChecking(true);
+
+      try {
+        const playlists = await getPlaylists();
+
+        for (const item of playlists) {
+          const playlist = await getPlaylist(item.id);
+
+          if (playlist.items.some((entry) => String(entry.story.id) === String(currentStory.id))) {
+            if (!cancelled) {
+              setIsInPlaylist(true);
+              setPlaylistChecking(false);
+            }
+            return;
+          }
+        }
+
+        if (!cancelled) {
+          setIsInPlaylist(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("playlist membership check error:", error);
+          setIsInPlaylist(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setPlaylistChecking(false);
+        }
+      }
+    };
+
+    checkPlaylistMembership();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, currentStory?.id]);
 
   const updateDragProgress = (locationX: number) => {
     const width = progressBarWidthRef.current;
@@ -455,9 +506,16 @@ async function handleShare() {
           <TouchableOpacity
             onPress={handleAddToPlaylist}
             style={styles.actionBtn}
+            disabled={playlistChecking}
           >
-            <Feather name="plus" size={26} color="#fff" />
-            <Text style={styles.actionLabel}>प्लेलिस्ट</Text>
+            <Feather
+              name={isInPlaylist ? "check-circle" : "plus"}
+              size={26}
+              color={isInPlaylist ? "#4CAF50" : "#fff"}
+            />
+            <Text style={styles.actionLabel}>
+              {isInPlaylist ? "प्लेलिस्ट में बा" : "प्लेलिस्ट"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleDownload} style={styles.actionBtn} disabled={isDownloading}>
