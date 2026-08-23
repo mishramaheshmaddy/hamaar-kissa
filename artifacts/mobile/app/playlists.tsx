@@ -281,6 +281,7 @@ export default function PlaylistsScreen() {
 
         <FlatList
           data={playlist.items}
+          numColumns={2}
           keyExtractor={(item) => String(item.itemId)}
           refreshControl={
             <RefreshControl
@@ -296,25 +297,28 @@ export default function PlaylistsScreen() {
             const story = item.story;
 
             return (
-              <AudioCard
-                story={{
-                  id: String(story.id),
-                  title: story.title,
-                  narrator: story.narrator || "हमार किस्सा",
-                  description: story.description || "",
-                  thumbnail: story.thumbnailUrl || "",
-                  duration: 0,
-                  category: "folk",
-                  categoryName: story.categoryName,
-                  audioUrl: story.audioUrl,
-                }}
-                onPress={() =>
-                  router.push({
-                    pathname: "/audio/player",
-                    params: { id: String(story.id) },
-                  })
-                }
-              />
+              <View style={{ flex: 1, maxWidth: "50%" }}>
+                <AudioCard
+                  style={{ width: "100%", marginBottom: 0 }}
+                  story={{
+                    id: String(story.id),
+                    title: story.title,
+                    narrator: story.narrator || "हमार किस्सा",
+                    description: story.description || "",
+                    thumbnail: story.thumbnailUrl || "",
+                    duration: 0,
+                    category: "folk",
+                    categoryName: story.categoryName,
+                    audioUrl: story.audioUrl,
+                  }}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/audio/player",
+                      params: { id: String(story.id) },
+                    })
+                  }
+                />
+              </View>
             );
           }}
           ListEmptyComponent={
@@ -627,9 +631,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   list: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 32,
+    columnGap: 12,
+    rowGap: 16,
   },
   playlistRow: {
     minHeight: 72,
