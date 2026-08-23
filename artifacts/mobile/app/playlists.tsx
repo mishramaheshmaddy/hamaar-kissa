@@ -16,6 +16,8 @@ import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import { useColors } from "@/hooks/useColors";
+import AudioCard from "@/components/AudioCard";
+import MiniPlayer from "@/components/MiniPlayer";
 import {
   addToPlaylist,
   ApiAudioStory,
@@ -290,62 +292,31 @@ export default function PlaylistsScreen() {
           contentContainerStyle={
             playlist.items.length === 0 ? styles.emptyContainer : styles.list
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.storyRow,
-                { borderBottomColor: colors.border },
-              ]}
-              onPress={() =>
-                router.push({
-                  pathname: "/audio/player",
-                  params: { id: String(item.story.id) },
-                })
-              }
-            >
-              <View
-                style={[
-                  styles.storyIcon,
-                  { backgroundColor: colors.secondary },
-                ]}
-              >
-                <Feather
-                  name="headphones"
-                  size={18}
-                  color={colors.primary}
-                />
-              </View>
+          renderItem={({ item }) => {
+            const story = item.story;
 
-              <View style={styles.storyInfo}>
-                <Text
-                  style={[styles.storyTitle, { color: colors.foreground }]}
-                  numberOfLines={2}
-                >
-                  {item.story.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.storyNarrator,
-                    { color: colors.mutedForeground },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.story.narrator || "हमार किस्सा"}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => handleRemove(item.itemId)}
-              >
-                <Feather
-                  name="x"
-                  size={18}
-                  color={colors.mutedForeground}
-                />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          )}
+            return (
+              <AudioCard
+                story={{
+                  id: String(story.id),
+                  title: story.title,
+                  narrator: story.narrator || "हमार किस्सा",
+                  description: story.description || "",
+                  thumbnail: story.thumbnailUrl || "",
+                  duration: 0,
+                  category: "folk",
+                  categoryName: story.categoryName,
+                  audioUrl: story.audioUrl,
+                }}
+                onPress={() =>
+                  router.push({
+                    pathname: "/audio/player",
+                    params: { id: String(story.id) },
+                  })
+                }
+              />
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather
@@ -401,12 +372,32 @@ export default function PlaylistsScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={() => setShowCreate(true)}
-        >
-          <Feather name="plus" size={20} color="#fff" />
-        </TouchableOpacity>
+        {selectMode ? (
+          <TouchableOpacity
+            style={[
+              styles.addSelectedButton,
+              {
+                backgroundColor:
+                  selectedPlaylistIds.length > 0
+                    ? colors.primary
+                    : colors.mutedForeground,
+              },
+            ]}
+            onPress={handleAddSelected}
+            disabled={saving}
+          >
+            <Text style={styles.addSelectedButtonText}>
+              {saving ? "..." : "जोड़ें"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={() => setShowCreate(true)}
+          >
+            <Feather name="plus" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -431,20 +422,42 @@ export default function PlaylistsScreen() {
                 borderColor: colors.border,
               },
             ]}
-            onPress={() =>
-              router.push(
-                `/playlists?id=${item.id}` as any
-              )
-            }
+            onPress={() => {
+              if (selectMode) {
+                togglePlaylistSelection(item.id);
+              } else {
+                router.push(`/playlists?id=${item.id}` as any);
+              }
+            }}
           >
-            <View
-              style={[
-                styles.playlistIcon,
-                { backgroundColor: colors.background },
-              ]}
-            >
-              <Feather name="list" size={22} color={colors.primary} />
-            </View>
+            {selectMode ? (
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    borderColor: selectedPlaylistIds.includes(item.id)
+                      ? colors.primary
+                      : colors.mutedForeground,
+                    backgroundColor: selectedPlaylistIds.includes(item.id)
+                      ? colors.primary
+                      : "transparent",
+                  },
+                ]}
+              >
+                {selectedPlaylistIds.includes(item.id) && (
+                  <Feather name="check" size={17} color="#fff" />
+                )}
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.playlistIcon,
+                  { backgroundColor: colors.background },
+                ]}
+              >
+                <Feather name="list" size={22} color={colors.primary} />
+              </View>
+            )}
 
             <View style={styles.playlistInfo}>
               <Text
@@ -463,11 +476,13 @@ export default function PlaylistsScreen() {
               </Text>
             </View>
 
-            <Feather
-              name="chevron-right"
-              size={20}
-              color={colors.mutedForeground}
-            />
+            {!selectMode && (
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.mutedForeground}
+              />
+            )}
           </TouchableOpacity>
         )}
         ListEmptyComponent={
@@ -564,6 +579,8 @@ export default function PlaylistsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <MiniPlayer />
     </View>
   );
 }
@@ -704,6 +721,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
+  },
+  addSelectedButton: {
+    minWidth: 72,
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addSelectedButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  checkbox: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
   },
   modalOverlay: {
     flex: 1,
