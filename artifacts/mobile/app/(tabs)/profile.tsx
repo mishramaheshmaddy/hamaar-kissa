@@ -92,6 +92,7 @@ export default function ProfileScreen() {
   const { savedStories, likedStories, history, playStory, currentStory, isPlaying, sleepTimerMinutes, clearUserLibrary } = useAudio();
   const { user, token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"saved" | "liked" | "history" | "submissions">("saved");
+  const [historyVisibleCount, setHistoryVisibleCount] = useState(4);
   const [allStories, setAllStories] = useState<AudioStory[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Array<{ id: number; title: string; status: string; adminNotes: string | null; createdAt: string }>>([]);
 
@@ -168,10 +169,23 @@ export default function ProfileScreen() {
   const likedItems = allStories.filter((s) => effectiveLiked.includes(s.id));
   const historyItems = allStories.filter((s) => effectiveHistory.includes(s.id));
 
+  const visibleHistoryItems = historyItems.slice(0, historyVisibleCount);
+  const hasMoreHistory = historyVisibleCount < historyItems.length;
+
   const activeItems =
     activeTab === "saved" ? savedItems :
     activeTab === "liked" ? likedItems :
-    historyItems;
+    visibleHistoryItems;
+
+  useEffect(() => {
+    setHistoryVisibleCount(4);
+  }, [effectiveHistory.length]);
+
+  useEffect(() => {
+    if (activeTab !== "history") {
+      setHistoryVisibleCount(4);
+    }
+  }, [activeTab]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -328,15 +342,58 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            activeItems.map((item) => (
-              <AudioCard
-                key={item.id}
-                story={item}
-                compact
-                onPress={() => { playStory(item); router.push("/audio/player"); }}
-                isPlaying={currentStory?.id === item.id && isPlaying}
-              />
-            ))
+            <>
+              {activeItems.map((item) => (
+                <AudioCard
+                  key={item.id}
+                  story={item}
+                  compact
+                  onPress={() => { playStory(item); router.push("/audio/player"); }}
+                  isPlaying={currentStory?.id === item.id && isPlaying}
+                />
+              ))}
+
+              {activeTab === "history" && hasMoreHistory && (
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(
+                      Haptics.ImpactFeedbackStyle.Light
+                    );
+                    setHistoryVisibleCount((count) => count + 4);
+                  }}
+                  activeOpacity={0.8}
+                  style={{
+                    marginHorizontal: 16,
+                    marginTop: 4,
+                    marginBottom: 12,
+                    minHeight: 42,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.primary,
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
+                    और देखीं
+                  </Text>
+                  <Feather
+                    name="chevron-down"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
 
