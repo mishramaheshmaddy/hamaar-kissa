@@ -769,7 +769,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         : [...likedStories, id];
       setLikedStories(updated);
       await AsyncStorage.setItem("liked_stories", JSON.stringify(updated)).catch(() => {});
-      if (!alreadyLiked) trackEvent("like", "story", id);
+      trackEvent(
+        alreadyLiked ? "like_removed" : "like",
+        "story",
+        id,
+      );
     },
     [likedStories]
   );
@@ -782,7 +786,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         : [...savedStories, id];
       setSavedStories(updated);
       await AsyncStorage.setItem("saved_stories", JSON.stringify(updated)).catch(() => {});
-      if (!alreadySaved) trackEvent("save", "story", id);
+      trackEvent(
+        alreadySaved ? "save_removed" : "save",
+        "story",
+        id,
+      );
     },
     [savedStories]
   );

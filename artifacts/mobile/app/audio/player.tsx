@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -23,7 +23,7 @@ import { useColors } from "@/hooks/useColors";
 import { CATEGORY_GRADIENTS } from "@/components/CategoryColors";
 import { useDownloads } from "@/hooks/useDownloads";
 import { downloadAudio, getFileSize } from "@/lib/downloadManager";
-import { apiFetch, ApiAudioStory, getPlaylist, getPlaylists, trackEvent } from "@/lib/api";
+import { apiFetch, ApiAudioStory, ApiAudioStoryStats, getAudioStoryStats, getPlaylist, getPlaylists, trackEvent } from "@/lib/api";
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
@@ -115,10 +115,44 @@ export default function AudioPlayerScreen() {
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isInPlaylist, setIsInPlaylist] = useState(false);
   const [playlistChecking, setPlaylistChecking] = useState(false);
+  const [storyStats, setStoryStats] = useState<ApiAudioStoryStats | null>(null);
   const [recommended, setRecommended] = useState<AudioStory[]>([]);
   const [moreByNarrator, setMoreByNarrator] = useState<AudioStory[]>([]);
 
   const displayedProgress = dragProgress ?? progress;
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      if (!currentStory) {
+        setStoryStats(null);
+        return;
+      }
+
+      const refreshStoryStats = async () => {
+        try {
+          const stats = await getAudioStoryStats(Number(currentStory.id));
+
+          if (!cancelled) {
+            setStoryStats(stats);
+          }
+        } catch (error) {
+          console.error("story engagement stats error:", error);
+        }
+      };
+
+      setStoryStats(null);
+      refreshStoryStats();
+
+      const interval = setInterval(refreshStoryStats, 5000);
+
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+      };
+    }, [currentStory?.id]),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -337,7 +371,20 @@ async function handleShare() {
       message: `🎙️ ${currentStory!.title}\nसुनावत बाड़े: ${currentStory!.narrator}\n\nHamaar Kissa पर सुनीं!\n${webUrl}`,
       url: Platform.OS === "ios" ? webUrl : undefined,
     };
-    await Share.share(shareContent);
+    const result = await Share.share(shareContent);
+
+    if (result.action !== Share.dismissedAction) {
+      trackEvent("share", "story", currentStory!.id);
+
+      setStoryStats((current) =>
+        current
+          ? {
+              ...current,
+              shares: current.shares + 1,
+            }
+          : current,
+      );
+    }
   } catch (_e) {
     // User cancelled — no-op
   }
@@ -371,6 +418,16 @@ async function handleShare() {
       });
       setDownloadProgress(null);
       trackEvent("download", "story", currentStory.id);
+
+      setStoryStats((current) =>
+        current
+          ? {
+              ...current,
+              downloads: current.downloads + 1,
+            }
+          : current,
+      );
+
       Alert.alert("✅", "डाउनलोड पूरा भइल!");
     } catch (e) {
       console.error("startDownload error:", e, "url:", fullAudioUrl);
@@ -478,29 +535,62 @@ async function handleShare() {
         <View style={styles.actionRow}>
           <TouchableOpacity
             onPress={() => requireLogin(() => {
+              const wasLiked = isLiked;
+
               toggleLike(currentStory.id);
+
+              setStoryStats((current) =>
+                current
+                  ? {
+                      ...current,
+                      likes: Math.max(
+                        0,
+                        current.likes + (wasLiked ? -1 : 1),
+                      ),
+                    }
+                  : current,
+              );
+
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             })}
             style={styles.actionBtn}
           >
             <Feather name="heart" size={26} color={isLiked ? "#FF4444" : "#fff"} />
             <Text style={styles.actionLabel}>पसंद</Text>
+            <Text style={styles.actionCount}>{storyStats?.likes ?? 0}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => requireLogin(() => {
+              const wasSaved = isSaved;
+
               toggleSave(currentStory.id);
+
+              setStoryStats((current) =>
+                current
+                  ? {
+                      ...current,
+                      saves: Math.max(
+                        0,
+                        current.saves + (wasSaved ? -1 : 1),
+                      ),
+                    }
+                  : current,
+              );
+
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             })}
             style={styles.actionBtn}
           >
             <Feather name="bookmark" size={26} color={isSaved ? "#F5A623" : "#fff"} />
             <Text style={styles.actionLabel}>सेव</Text>
+            <Text style={styles.actionCount}>{storyStats?.saves ?? 0}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleShare} style={styles.actionBtn}>
             <Feather name="share-2" size={26} color="#fff" />
             <Text style={styles.actionLabel}>शेयर</Text>
+            <Text style={styles.actionCount}>{storyStats?.shares ?? 0}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -515,6 +605,9 @@ async function handleShare() {
             />
             <Text style={styles.actionLabel}>
               {isInPlaylist ? "प्लेलिस्ट में बा" : "प्लेलिस्ट"}
+            </Text>
+            <Text style={styles.actionCount}>
+              {storyStats?.playlistAdds ?? 0}
             </Text>
           </TouchableOpacity>
 
@@ -532,6 +625,9 @@ async function handleShare() {
             )}
             <Text style={styles.actionLabel}>
               {downloaded ? "डाउनलोडेड" : "डाउनलोड"}
+            </Text>
+            <Text style={styles.actionCount}>
+              {storyStats?.downloads ?? 0}
             </Text>
           </TouchableOpacity>
         </View>
@@ -840,7 +936,17 @@ const styles = StyleSheet.create({
   },
   actionRow: { flexDirection: "row", gap: 24, marginBottom: 28 },
   actionBtn: { alignItems: "center", gap: 5, padding: 8 },
-  actionLabel: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "600" },
+  actionLabel: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  actionCount: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: -1,
+  },
   downloadProgressText: {
     color: "#fff",
     fontSize: 14,

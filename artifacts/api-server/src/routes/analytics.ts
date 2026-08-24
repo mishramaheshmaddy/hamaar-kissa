@@ -10,6 +10,8 @@ import {
   pushTokensTable,
   scheduledNotificationsTable,
   analyticsEventsTable,
+  playlistsTable,
+  playlistItemsTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
 import { verifyUserToken } from "./userAuth";
@@ -25,7 +27,7 @@ function daysAgo(n: number): Date {
 // Phase 2 event types the mobile app is allowed to send. Kept as a fixed
 // list (rather than accepting anything the client sends) so a typo or a
 // future ad-hoc event on the client can't silently pollute the table.
-const ANALYTICS_EVENT_TYPES = ["story_play", "video_play", "download", "like", "save"] as const;
+const ANALYTICS_EVENT_TYPES = ["story_play", "video_play", "download", "like", "like_removed", "save", "save_removed", "share"] as const;
 type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
 
 function isAnalyticsEventType(v: unknown): v is AnalyticsEventType {
@@ -49,6 +51,130 @@ function isAnalyticsContentType(v: unknown): v is AnalyticsContentType {
 // or invalid token still records the event, just with userId: null,
 // since this must never block or fail visibly for the person using the app.
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// Story engagement stats — GET /api/analytics/story/:id
+// ---------------------------------------------------------------------
+router.get("/analytics/story/:id", async (req, res) => {
+  try {
+    const storyId = Number(req.params.id);
+
+    if (!Number.isInteger(storyId)) {
+      res.status(400).json({ error: "Invalid story id" });
+      return;
+    }
+
+    const [reactionRows, shareRows, downloadUsers, playlistUsers] =
+      await Promise.all([
+        db
+          .select({
+            userId: analyticsEventsTable.userId,
+            eventType: analyticsEventsTable.eventType,
+          })
+          .from(analyticsEventsTable)
+          .where(
+            and(
+              eq(analyticsEventsTable.contentType, "story"),
+              eq(analyticsEventsTable.contentId, storyId),
+              or(
+                eq(analyticsEventsTable.eventType, "like"),
+                eq(analyticsEventsTable.eventType, "like_removed"),
+                eq(analyticsEventsTable.eventType, "save"),
+                eq(analyticsEventsTable.eventType, "save_removed"),
+              ),
+            ),
+          )
+          .orderBy(desc(analyticsEventsTable.id)),
+
+        db
+          .select({ count: count() })
+          .from(analyticsEventsTable)
+          .where(
+            and(
+              eq(analyticsEventsTable.contentType, "story"),
+              eq(analyticsEventsTable.contentId, storyId),
+              eq(analyticsEventsTable.eventType, "share"),
+            ),
+          ),
+
+        db
+          .selectDistinct({
+            userId: analyticsEventsTable.userId,
+          })
+          .from(analyticsEventsTable)
+          .where(
+            and(
+              eq(analyticsEventsTable.contentType, "story"),
+              eq(analyticsEventsTable.contentId, storyId),
+              eq(analyticsEventsTable.eventType, "download"),
+            ),
+          ),
+
+        db
+          .selectDistinct({
+            userId: playlistsTable.userId,
+          })
+          .from(playlistItemsTable)
+          .innerJoin(
+            playlistsTable,
+            eq(playlistItemsTable.playlistId, playlistsTable.id),
+          )
+          .where(eq(playlistItemsTable.audioStoryId, storyId)),
+      ]);
+
+    const latestLikeByUser = new Map<number, string>();
+    const latestSaveByUser = new Map<number, string>();
+
+    for (const row of reactionRows) {
+      if (row.userId === null) continue;
+
+      if (
+        row.eventType === "like" ||
+        row.eventType === "like_removed"
+      ) {
+        if (!latestLikeByUser.has(row.userId)) {
+          latestLikeByUser.set(row.userId, row.eventType);
+        }
+      }
+
+      if (
+        row.eventType === "save" ||
+        row.eventType === "save_removed"
+      ) {
+        if (!latestSaveByUser.has(row.userId)) {
+          latestSaveByUser.set(row.userId, row.eventType);
+        }
+      }
+    }
+
+    const likes = Array.from(latestLikeByUser.values()).filter(
+      (eventType) => eventType === "like",
+    ).length;
+
+    const saves = Array.from(latestSaveByUser.values()).filter(
+      (eventType) => eventType === "save",
+    ).length;
+
+    const shares = Number(shareRows[0]?.count ?? 0);
+
+    const downloads = downloadUsers.filter(
+      (row) => row.userId !== null,
+    ).length;
+
+    const playlistAdds = playlistUsers.length;
+
+    res.json({
+      likes,
+      saves,
+      shares,
+      playlistAdds,
+      downloads,
+    });
+  } catch (e) {
+    console.error("GET /analytics/story/:id error:", e);
+    res.status(500).json({ error: "Failed to load story stats" });
+  }
+});
+
 router.post("/analytics", async (req, res) => {
   try {
     const { eventType, contentType, contentId } = req.body as {

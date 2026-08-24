@@ -36,6 +36,22 @@ export interface ApiAudioStory {
   published?: boolean;
 }
 
+export interface ApiAudioStoryStats {
+  likes: number;
+  saves: number;
+  shares: number;
+  playlistAdds: number;
+  downloads: number;
+}
+
+export async function getAudioStoryStats(
+  audioStoryId: number,
+): Promise<ApiAudioStoryStats> {
+  return apiFetch<ApiAudioStoryStats>(
+    `/api/analytics/story/${audioStoryId}`,
+  );
+}
+
 export interface ApiVideo {
   id: number;
   title: string;
@@ -71,7 +87,7 @@ export async function apiFetch<T>(path: string): Promise<T> {
 // a flaky network or a slow/down analytics endpoint should never be
 // visible to someone listening to a story or watching a video.
 // ---------------------------------------------------------------------
-export type AnalyticsEventType = "story_play" | "video_play" | "download" | "like" | "save";
+export type AnalyticsEventType = "story_play" | "video_play" | "download" | "like" | "like_removed" | "save" | "save_removed" | "share";
 export type AnalyticsContentType = "story" | "video";
 
 export function trackEvent(
