@@ -93,6 +93,9 @@ export default function ProfileScreen() {
   const { user, token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<"saved" | "liked" | "history" | "submissions">("saved");
   const [historyVisibleCount, setHistoryVisibleCount] = useState(4);
+  const [savedVisibleCount, setSavedVisibleCount] = useState(4);
+  const [likedVisibleCount, setLikedVisibleCount] = useState(4);
+  const [submissionsVisibleCount, setSubmissionsVisibleCount] = useState(4);
   const [allStories, setAllStories] = useState<AudioStory[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Array<{ id: number; title: string; status: string; adminNotes: string | null; createdAt: string }>>([]);
 
@@ -170,11 +173,19 @@ export default function ProfileScreen() {
   const historyItems = allStories.filter((s) => effectiveHistory.includes(s.id));
 
   const visibleHistoryItems = historyItems.slice(0, historyVisibleCount);
+  const visibleSavedItems = savedItems.slice(0, savedVisibleCount);
+  const visibleLikedItems = likedItems.slice(0, likedVisibleCount);
+  const visibleSubmissionItems = mySubmissions.slice(0, submissionsVisibleCount);
+
   const hasMoreHistory = historyVisibleCount < historyItems.length;
+  const hasMoreSaved = savedVisibleCount < savedItems.length;
+  const hasMoreLiked = likedVisibleCount < likedItems.length;
+  const hasMoreSubmissions =
+    submissionsVisibleCount < mySubmissions.length;
 
   const activeItems =
-    activeTab === "saved" ? savedItems :
-    activeTab === "liked" ? likedItems :
+    activeTab === "saved" ? visibleSavedItems :
+    activeTab === "liked" ? visibleLikedItems :
     visibleHistoryItems;
 
   useEffect(() => {
@@ -182,8 +193,32 @@ export default function ProfileScreen() {
   }, [effectiveHistory.length]);
 
   useEffect(() => {
+    setSavedVisibleCount(4);
+  }, [effectiveSaved.length]);
+
+  useEffect(() => {
+    setLikedVisibleCount(4);
+  }, [effectiveLiked.length]);
+
+  useEffect(() => {
+    setSubmissionsVisibleCount(4);
+  }, [mySubmissions.length]);
+
+  useEffect(() => {
     if (activeTab !== "history") {
       setHistoryVisibleCount(4);
+    }
+
+    if (activeTab !== "saved") {
+      setSavedVisibleCount(4);
+    }
+
+    if (activeTab !== "liked") {
+      setLikedVisibleCount(4);
+    }
+
+    if (activeTab !== "submissions") {
+      setSubmissionsVisibleCount(4);
     }
   }, [activeTab]);
 
@@ -284,82 +319,83 @@ export default function ProfileScreen() {
         {/* Content List */}
         <View style={styles.content}>
           {activeTab === "submissions" ? (
-            mySubmissions.map((sub) => (
-              <View
-                key={sub.id}
-                style={{
-                  padding: 12,
-                  marginHorizontal: 16,
-                  marginBottom: 8,
-                  borderRadius: 10,
-                  backgroundColor: colors.card,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontWeight: "700", color: colors.foreground, flex: 1 }}>{sub.title}</Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "700",
-                      color:
-                        sub.status === "approved" ? "#16a34a" : sub.status === "rejected" ? "#dc2626" : "#ca8a04",
-                    }}
-                  >
-                    {sub.status === "approved" ? "स्वीकृत ✅" : sub.status === "rejected" ? "अस्वीकृत ❌" : "समीक्षा में ⏳"}
-                  </Text>
-                </View>
-                {sub.adminNotes ? (
-                  <Text
-                    style={{
-                      marginTop: 6,
-                      color: sub.status === "rejected" ? "#dc2626" : "#16a34a",
-                      fontSize: 13,
-                    }}
-                  >
-                    {sub.status === "rejected" ? `कारण: ${sub.adminNotes}` : sub.adminNotes}
-                  </Text>
-                ) : null}
-              </View>
-            ))
-          ) : activeItems.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 48 }}>
-                {activeTab === "saved" ? "🔖" : activeTab === "liked" ? "❤️" : "🕐"}
-              </Text>
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-                {activeTab === "saved" ? "कवनो सेव नइखे" : activeTab === "liked" ? "कवनो पसंद नइखे" : "कवनो इतिहास नइखे"}
-              </Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                कहानी सुनल शुरू करीं
-              </Text>
-              <TouchableOpacity
-                style={[styles.exploreBtn, { backgroundColor: colors.primary }]}
-                onPress={() => router.push("/(tabs)/audio")}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>कहानी देखीं</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
             <>
-              {activeItems.map((item) => (
-                <AudioCard
-                  key={item.id}
-                  story={item}
-                  compact
-                  onPress={() => { playStory(item); router.push("/audio/player"); }}
-                  isPlaying={currentStory?.id === item.id && isPlaying}
-                />
+              {visibleSubmissionItems.map((sub) => (
+                <View
+                  key={sub.id}
+                  style={{
+                    padding: 12,
+                    marginHorizontal: 16,
+                    marginBottom: 8,
+                    borderRadius: 10,
+                    backgroundColor: colors.card,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontWeight: "700",
+                        color: colors.foreground,
+                        flex: 1,
+                      }}
+                    >
+                      {sub.title}
+                    </Text>
+
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color:
+                          sub.status === "approved"
+                            ? "#16a34a"
+                            : sub.status === "rejected"
+                              ? "#dc2626"
+                              : "#ca8a04",
+                      }}
+                    >
+                      {sub.status === "approved"
+                        ? "स्वीकृत ✅"
+                        : sub.status === "rejected"
+                          ? "अस्वीकृत ❌"
+                          : "समीक्षा में ⏳"}
+                    </Text>
+                  </View>
+
+                  {sub.adminNotes ? (
+                    <Text
+                      style={{
+                        marginTop: 6,
+                        color:
+                          sub.status === "rejected"
+                            ? "#dc2626"
+                            : "#16a34a",
+                        fontSize: 13,
+                      }}
+                    >
+                      {sub.status === "rejected"
+                        ? `कारण: ${sub.adminNotes}`
+                        : sub.adminNotes}
+                    </Text>
+                  ) : null}
+                </View>
               ))}
 
-              {activeTab === "history" && hasMoreHistory && (
+              {hasMoreSubmissions && (
                 <TouchableOpacity
                   onPress={() => {
                     Haptics.impactAsync(
                       Haptics.ImpactFeedbackStyle.Light
                     );
-                    setHistoryVisibleCount((count) => count + 4);
+                    setSubmissionsVisibleCount((count) => count + 4);
                   }}
                   activeOpacity={0.8}
                   style={{
@@ -386,6 +422,124 @@ export default function ProfileScreen() {
                   >
                     और देखीं
                   </Text>
+
+                  <Feather
+                    name="chevron-down"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              )}
+            </>
+          ) : activeItems.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={{ fontSize: 48 }}>
+                {activeTab === "saved"
+                  ? "🔖"
+                  : activeTab === "liked"
+                    ? "❤️"
+                    : "🕐"}
+              </Text>
+
+              <Text
+                style={[
+                  styles.emptyTitle,
+                  { color: colors.foreground },
+                ]}
+              >
+                {activeTab === "saved"
+                  ? "कवनो सेव नइखे"
+                  : activeTab === "liked"
+                    ? "कवनो पसंद नइखे"
+                    : "कवनो इतिहास नइखे"}
+              </Text>
+
+              <Text
+                style={[
+                  styles.emptyText,
+                  { color: colors.mutedForeground },
+                ]}
+              >
+                कहानी सुनल शुरू करीं
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.exploreBtn,
+                  { backgroundColor: colors.primary },
+                ]}
+                onPress={() => router.push("/(tabs)/audio")}
+              >
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "700",
+                  }}
+                >
+                  कहानी देखीं
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {activeItems.map((item) => (
+                <AudioCard
+                  key={item.id}
+                  story={item}
+                  compact
+                  onPress={() => {
+                    playStory(item);
+                    router.push("/audio/player");
+                  }}
+                  isPlaying={
+                    currentStory?.id === item.id && isPlaying
+                  }
+                />
+              ))}
+
+              {(activeTab === "history" && hasMoreHistory ||
+                activeTab === "saved" && hasMoreSaved ||
+                activeTab === "liked" && hasMoreLiked) && (
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(
+                      Haptics.ImpactFeedbackStyle.Light
+                    );
+
+                    if (activeTab === "history") {
+                      setHistoryVisibleCount((count) => count + 4);
+                    } else if (activeTab === "saved") {
+                      setSavedVisibleCount((count) => count + 4);
+                    } else if (activeTab === "liked") {
+                      setLikedVisibleCount((count) => count + 4);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  style={{
+                    marginHorizontal: 16,
+                    marginTop: 4,
+                    marginBottom: 12,
+                    minHeight: 42,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.primary,
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
+                    और देखीं
+                  </Text>
+
                   <Feather
                     name="chevron-down"
                     size={18}
