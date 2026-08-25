@@ -16,6 +16,7 @@ import pushTokensRouter from "./pushTokens";
 import notificationsRouter from "./notifications";
 import analyticsRouter from "./analytics";
 import playlistsRouter from "./playlists";
+import videoEngagementRouter from "./videoEngagement";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(pushTokensRouter);
 router.use(notificationsRouter);
 router.use(analyticsRouter);
 router.use(playlistsRouter);
+router.use(videoEngagementRouter);
 
 export default router;

@@ -26,7 +26,13 @@ import {
 
 
 import { VideoItem } from "@/data/mockData";
-import { trackEvent } from "@/lib/api";
+import {
+  addVideoComment,
+  getVideoEngagement,
+  setVideoReaction,
+  trackEvent,
+  type ApiVideoComment,
+} from "@/lib/api";
 
 const { width, height } = Dimensions.get("window");
 const CARD_HEIGHT = height;
@@ -104,8 +110,11 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPauseIcon, setShowPauseIcon] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
-  const [comments, setComments] = useState<{id: number; user: string; text: string}[]>([]);
+  const [comments, setComments] = useState<ApiVideoComment[]>([]);
+  const [engagementLoading, setEngagementLoading] = useState(true);
+  const [reactionSaving, setReactionSaving] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<ApiVideoComment | null>(null);
   const { user } = useAuth();
   const router = useRouter();
   const videoRef = useRef<Video>(null);
@@ -139,14 +148,43 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     action();
   };
 
-  const handleAddComment = () => {
-    if (!newComment.trim()) return;
-    setComments(prev => [...prev, {
-      id: Date.now(),
-      user: user?.name || "आप",
-      text: newComment.trim(),
-    }]);
-    setNewComment("");
+  useEffect(() => {
+    let cancelled = false;
+    setEngagementLoading(true);
+    getVideoEngagement(Number(video.id))
+      .then((data) => {
+        if (cancelled) return;
+        setLiked(data.liked);
+        setLikeCount(data.likes);
+        setSaved(data.saved);
+        setComments(data.comments);
+      })
+      .catch((error) => {
+        console.warn("video engagement load failed", error);
+      })
+      .finally(() => {
+        if (!cancelled) setEngagementLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [video.id, user?.id]);
+
+  const handleAddComment = async () => {
+    const text = newComment.trim();
+    if (!text || !user) return;
+
+    try {
+      const comment = await addVideoComment(
+        Number(video.id),
+        text,
+        replyingTo?.id ?? null,
+      );
+
+      setComments((prev) => [comment, ...prev]);
+      setNewComment("");
+      setReplyingTo(null);
+    } catch {
+      Alert.alert("कमेंट ना जुड़ल", "कृपया फेर से कोशिश करीं।");
+    }
   };
 
   // Pause (and fully unload) as soon as this card scrolls off-screen —
@@ -261,6 +299,57 @@ const handlePlay = async () => {
     return `${BASE}${video.videoUrl}`;
   };
 
+  const renderComment = (comment: ApiVideoComment, depth = 0): React.ReactNode => {
+    const replies = comments.filter(
+      (item) => item.parentCommentId === comment.id,
+    );
+
+    return (
+      <View key={comment.id}>
+        <View
+          style={[
+            styles.commentItem,
+            {
+              marginLeft: Math.min(depth * 28, 140),
+            },
+          ]}
+        >
+          <View style={styles.commentAvatar}>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
+              {comment.user.charAt(0)}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.commentUser}>{comment.user}</Text>
+            <Text style={styles.commentText}>{comment.text}</Text>
+
+            <TouchableOpacity
+              onPress={() => setReplyingTo(comment)}
+              style={{ marginTop: 6, alignSelf: "flex-start" }}
+            >
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.65)",
+                  fontSize: 12,
+                  fontWeight: "600",
+                }}
+              >
+                जवाब दीं
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {replies.map((reply) => renderComment(reply, depth + 1))}
+      </View>
+    );
+  };
+
+  const topLevelComments = comments.filter(
+    (comment) => comment.parentCommentId == null,
+  );
+
   return (
     <View style={[styles.container, { height: CARD_HEIGHT }]}>
       {started && video.videoUrl ? (
@@ -327,12 +416,28 @@ const handlePlay = async () => {
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={async () => {
+          onPress={() => requireLogin(async () => {
+            if (reactionSaving) return;
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            if (!liked) trackEvent("like", "video", video.id);
-            setLiked((l) => !l);
-            setLikeCount((c) => (liked ? c - 1 : c + 1));
-          }}
+            const nextLiked = !liked;
+            const previousLiked = liked;
+            setLiked(nextLiked);
+            setLikeCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+            setReactionSaving(true);
+            try {
+              const data = await setVideoReaction(Number(video.id), nextLiked, saved);
+              setLiked(data.liked);
+              setLikeCount(data.likes);
+              setSaved(data.saved);
+              trackEvent(nextLiked ? "like" : "like_removed", "video", video.id);
+            } catch {
+              setLiked(previousLiked);
+              setLikeCount((c) => Math.max(0, c + (nextLiked ? -1 : 1)));
+              Alert.alert("पसंद सेव ना भइल", "कृपया फेर से कोशिश करीं।");
+            } finally {
+              setReactionSaving(false);
+            }
+          })}
         >
           <Feather name="heart" size={26} color={liked ? "#FF4444" : "#fff"} />
           <Text style={styles.actionLabel}>
@@ -344,24 +449,47 @@ const handlePlay = async () => {
 
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() => setCommentOpen(true)}
+          onPress={() => {
+            if (!engagementLoading) setCommentOpen(true);
+          }}
         >
           <Feather name="message-circle" size={26} color="#fff" />
           <Text style={styles.actionLabel}>बतावऽ ({comments.length})</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={async () => {
+            trackEvent("share", "video", video.id);
+            await handleShare();
+          }}
+        >
           <Feather name="share-2" size={26} color="#fff" />
           <Text style={styles.actionLabel}>शेयर</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={async () => {
+          onPress={() => requireLogin(async () => {
+            if (reactionSaving) return;
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            if (!saved) trackEvent("save", "video", video.id);
-            setSaved((s) => !s);
-          }}
+            const nextSaved = !saved;
+            const previousSaved = saved;
+            setSaved(nextSaved);
+            setReactionSaving(true);
+            try {
+              const data = await setVideoReaction(Number(video.id), liked, nextSaved);
+              setSaved(data.saved);
+              setLiked(data.liked);
+              setLikeCount(data.likes);
+              trackEvent(nextSaved ? "save" : "save_removed", "video", video.id);
+            } catch {
+              setSaved(previousSaved);
+              Alert.alert("सेव ना भइल", "कृपया फेर से कोशिश करीं।");
+            } finally {
+              setReactionSaving(false);
+            }
+          })}
         >
           <Feather name="bookmark" size={26} color={saved ? "#F5A623" : "#fff"} />
           <Text style={styles.actionLabel}>सेव</Text>
@@ -389,24 +517,56 @@ const handlePlay = async () => {
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.commentList} showsVerticalScrollIndicator={false}>
-            {comments.map((c) => (
-              <View key={c.id} style={styles.commentItem}>
-                <View style={styles.commentAvatar}>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
-                    {c.user.charAt(0)}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.commentUser}>{c.user}</Text>
-                  <Text style={styles.commentText}>{c.text}</Text>
-                </View>
-              </View>
-            ))}
+            {topLevelComments.map((comment) => renderComment(comment))}
           </ScrollView>
+
+          {replyingTo && (
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderTopWidth: 1,
+                borderTopColor: "rgba(255,255,255,0.08)",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.55)",
+                    fontSize: 11,
+                  }}
+                >
+                  जवाब देत बानी
+                </Text>
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: "600",
+                  }}
+                  numberOfLines={1}
+                >
+                  {replyingTo.user}
+                </Text>
+              </View>
+
+              <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                <Feather name="x" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.commentInputRow}>
             <TextInput
               style={styles.commentInput}
-              placeholder="अपनी बात लिखीं..."
+              placeholder={
+                replyingTo
+                  ? `${replyingTo.user} के जवाब में लिखीं...`
+                  : "अपनी बात लिखीं..."
+              }
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={newComment}
               onChangeText={setNewComment}

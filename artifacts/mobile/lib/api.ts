@@ -64,6 +64,67 @@ export interface ApiVideo {
   sourceType?: string;
 }
 
+export interface ApiVideoComment {
+  id: number;
+  text: string;
+  userId: number;
+  user: string;
+  avatarUrl: string | null;
+  createdAt: string;
+  parentCommentId: number | null;
+}
+
+export interface ApiVideoEngagement {
+  likes: number;
+  saves: number;
+  liked: boolean;
+  saved: boolean;
+  comments: ApiVideoComment[];
+}
+
+export async function getVideoEngagement(
+  videoId: number,
+): Promise<ApiVideoEngagement> {
+  const token = await AsyncStorage.getItem("hk_token");
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${BASE}/api/videos/${videoId}/engagement`, { headers });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json() as Promise<ApiVideoEngagement>;
+}
+
+export interface ApiVideoReaction {
+  liked: boolean;
+  saved: boolean;
+  likes: number;
+  saves: number;
+}
+
+export async function setVideoReaction(
+  videoId: number,
+  liked: boolean,
+  saved: boolean,
+): Promise<ApiVideoReaction> {
+  return authenticatedFetch<ApiVideoReaction>(`/api/videos/${videoId}/reaction`, {
+    method: "PUT",
+    body: JSON.stringify({ liked, saved }),
+  });
+}
+
+export async function addVideoComment(
+  videoId: number,
+  text: string,
+  parentCommentId?: number | null,
+): Promise<ApiVideoComment> {
+  return authenticatedFetch<ApiVideoComment>(`/api/videos/${videoId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({
+      text,
+      ...(parentCommentId != null ? { parentCommentId } : {}),
+    }),
+  });
+}
+
 export async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
 

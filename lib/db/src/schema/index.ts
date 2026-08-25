@@ -11,3 +11,5 @@ export * from "./scheduledNotifications";
 export * from "./analyticsEvents";
 
 export * from "./playlists";
+export * from "./videoReactions";
+export * from "./videoComments";
