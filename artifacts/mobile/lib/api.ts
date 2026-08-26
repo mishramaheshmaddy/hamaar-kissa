@@ -129,6 +129,10 @@ export async function getSavedVideos(): Promise<ApiVideo[]> {
   return authenticatedFetch<ApiVideo[]>("/api/profile/saved-videos");
 }
 
+export async function getLikedVideos(): Promise<ApiVideo[]> {
+  return authenticatedFetch<ApiVideo[]>("/api/profile/liked-videos");
+}
+
 export async function apiFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
 

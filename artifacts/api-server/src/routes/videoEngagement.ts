@@ -70,6 +70,49 @@ router.get("/profile/saved-videos", requireUserAuth, async (req, res) => {
   }
 });
 
+router.get("/profile/liked-videos", requireUserAuth, async (req, res) => {
+  try {
+    const user = (req as unknown as { user: { id: number } }).user;
+
+    const rows = await db
+      .select({
+        video: videosTable,
+      })
+      .from(videoReactionsTable)
+      .innerJoin(videosTable, eq(videoReactionsTable.videoId, videosTable.id))
+      .where(
+        and(
+          eq(videoReactionsTable.userId, user.id),
+          eq(videoReactionsTable.liked, true),
+          eq(videosTable.published, true),
+        ),
+      )
+      .orderBy(
+        desc(videoReactionsTable.updatedAt),
+        desc(videoReactionsTable.id),
+      );
+
+    res.json(
+      rows.map(({ video }) => ({
+        id: video.id,
+        title: video.title,
+        categoryId: video.categoryId,
+        categoryName: null,
+        description: video.description,
+        thumbnailUrl: video.thumbnailUrl ?? null,
+        videoUrl: video.videoUrl,
+        sourceType: video.sourceType,
+        youtubeId: video.youtubeId ?? null,
+        views: video.views,
+        published: video.published,
+      })),
+    );
+  } catch (e) {
+    console.error("GET /profile/liked-videos error:", e);
+    res.status(500).json({ error: "Failed to load liked videos" });
+  }
+});
+
 router.get("/videos/:id/engagement", async (req, res) => {
   try {
     const videoId = Number(req.params.id);

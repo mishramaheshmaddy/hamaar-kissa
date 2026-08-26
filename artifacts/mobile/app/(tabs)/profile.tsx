@@ -22,7 +22,7 @@ import { useTheme } from "@/theme/useTheme";
 import AudioCard from "@/components/AudioCard";
 import MiniPlayer from "@/components/MiniPlayer";
 import {
-  ApiVideo, apiFetch, ApiAudioStory, ApiCategory, BASE, getSavedVideos } from "@/lib/api";
+  ApiVideo, apiFetch, ApiAudioStory, ApiCategory, BASE, getSavedVideos, getLikedVideos } from "@/lib/api";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 
@@ -99,8 +99,11 @@ export default function ProfileScreen() {
   const [submissionsVisibleCount, setSubmissionsVisibleCount] = useState(4);
   const [allStories, setAllStories] = useState<AudioStory[]>([]);
   const [savedVideos, setSavedVideos] = useState<ApiVideo[]>([]);
+  const [likedVideos, setLikedVideos] = useState<ApiVideo[]>([]);
   const [savedMediaTab, setSavedMediaTab] = useState<"audio" | "video">("audio");
+  const [likedMediaTab, setLikedMediaTab] = useState<"audio" | "video">("audio");
   const [savedVideoVisibleCount, setSavedVideoVisibleCount] = useState(4);
+  const [likedVideoVisibleCount, setLikedVideoVisibleCount] = useState(4);
   const [mySubmissions, setMySubmissions] = useState<Array<{ id: number; title: string; status: string; adminNotes: string | null; createdAt: string }>>([]);
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -131,6 +134,15 @@ export default function ProfileScreen() {
           console.warn("saved videos load failed", error);
           setSavedVideos([]);
         }
+
+        try {
+          const videos = await getLikedVideos();
+          setLikedVideos(Array.isArray(videos) ? videos : []);
+        } catch (error) {
+          console.warn("liked videos load failed", error);
+          setLikedVideos([]);
+        }
+
         const res = await fetch(`${BASE}/api/submissions/my`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -210,6 +222,10 @@ export default function ProfileScreen() {
   useEffect(() => {
     setLikedVisibleCount(4);
   }, [effectiveLiked.length]);
+
+  useEffect(() => {
+    setLikedVideoVisibleCount(4);
+  }, [likedVideos.length]);
 
   useEffect(() => {
     setSubmissionsVisibleCount(4);
@@ -329,6 +345,77 @@ export default function ProfileScreen() {
 
         {/* Content List */}
         <View style={styles.content}>
+          {activeTab === "liked" && (
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginBottom: 12,
+                flexDirection: "row",
+                borderRadius: 10,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+                overflow: "hidden",
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setLikedMediaTab("audio")}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  minHeight: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor:
+                    likedMediaTab === "audio"
+                      ? colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      likedMediaTab === "audio"
+                        ? "#fff"
+                        : colors.mutedForeground,
+                    fontSize: 13,
+                    fontWeight: "700",
+                  }}
+                >
+                  🎧 ऑडियो
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setLikedMediaTab("video")}
+                activeOpacity={0.8}
+                style={{
+                  flex: 1,
+                  minHeight: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor:
+                    likedMediaTab === "video"
+                      ? colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      likedMediaTab === "video"
+                        ? "#fff"
+                        : colors.mutedForeground,
+                    fontSize: 13,
+                    fontWeight: "700",
+                  }}
+                >
+                  🎬 वीडियो
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {activeTab === "saved" && (
             <View
               style={{
@@ -400,7 +487,165 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {activeTab === "saved" && savedMediaTab === "video" ? (
+          {activeTab === "liked" && likedMediaTab === "video" ? (
+            likedVideos.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 48 }}>🎬</Text>
+                <Text
+                  style={[
+                    styles.emptyTitle,
+                    { color: colors.foreground },
+                  ]}
+                >
+                  कवनो पसंद वीडियो नइखे
+                </Text>
+                <Text
+                  style={[
+                    styles.emptyText,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  वीडियो में ❤️ पसंद करीं
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.exploreBtn,
+                    { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => router.push("/(tabs)/video" as any)}
+                >
+                  <Text
+                    style={{
+                      color: "#fff",
+                      fontWeight: "700",
+                    }}
+                  >
+                    वीडियो देखीं
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                {likedVideos
+                  .slice(0, likedVideoVisibleCount)
+                  .map((video) => (
+                    <TouchableOpacity
+                      key={video.id}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(tabs)/video",
+                          params: { videoId: String(video.id) },
+                        } as any)
+                      }
+                      style={{
+                        marginHorizontal: 16,
+                        marginBottom: 10,
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        backgroundColor: colors.card,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        flexDirection: "row",
+                      }}
+                    >
+                      <Image
+                        source={
+                          video.thumbnailUrl
+                            ? {
+                                uri: video.thumbnailUrl.startsWith("/")
+                                  ? `${BASE}${video.thumbnailUrl}`
+                                  : video.thumbnailUrl,
+                              }
+                            : require("@/assets/images/icon.png")
+                        }
+                        style={{
+                          width: 120,
+                          height: 76,
+                          backgroundColor: colors.border,
+                        }}
+                        contentFit="cover"
+                      />
+
+                      <View
+                        style={{
+                          flex: 1,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          numberOfLines={2}
+                          style={{
+                            color: colors.foreground,
+                            fontSize: 14,
+                            fontWeight: "700",
+                          }}
+                        >
+                          {video.title}
+                        </Text>
+
+                        {video.description ? (
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              color: colors.mutedForeground,
+                              fontSize: 12,
+                              marginTop: 4,
+                            }}
+                          >
+                            {video.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+
+                {likedVideoVisibleCount < likedVideos.length && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light
+                      );
+                      setLikedVideoVisibleCount((count) => count + 4);
+                    }}
+                    activeOpacity={0.8}
+                    style={{
+                      marginHorizontal: 16,
+                      marginTop: 4,
+                      marginBottom: 12,
+                      minHeight: 42,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.card,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.primary,
+                        fontSize: 13,
+                        fontWeight: "700",
+                      }}
+                    >
+                      और देखीं
+                    </Text>
+
+                    <Feather
+                      name="chevron-down"
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )
+          ) : activeTab === "saved" && savedMediaTab === "video" ? (
             savedVideos.length === 0 ? (
               <View style={styles.empty}>
                 <Text style={{ fontSize: 48 }}>🎬</Text>
