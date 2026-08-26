@@ -115,6 +115,9 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const [reactionSaving, setReactionSaving] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<ApiVideoComment | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Record<number, boolean>>({});
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<ApiVideoComment[]>([]);
   const { user } = useAuth();
   const router = useRouter();
   const videoRef = useRef<Video>(null);
@@ -168,6 +171,87 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     return () => { cancelled = true; };
   }, [video.id, user?.id]);
 
+  const getThreadRootId = (comment: ApiVideoComment): number => {
+    let current = comment;
+
+    for (let i = 0; i < comments.length; i += 1) {
+      if (current.parentCommentId == null) return current.id;
+
+      const parent = comments.find((item) => item.id === current.parentCommentId);
+
+      if (!parent) return current.id;
+
+      current = parent;
+    }
+
+    return current.id;
+  };
+
+  const updateMentionSuggestions = (value: string) => {
+    const match = value.match(/(?:^|\\s)@([^\\s@]*)$/);
+
+    if (!match) {
+      setMentionQuery("");
+      setMentionSuggestions([]);
+      return;
+    }
+
+    const query = match[1].toLowerCase();
+    const threadRootId = replyingTo ? getThreadRootId(replyingTo) : null;
+
+    if (threadRootId == null) {
+      setMentionQuery(query);
+      setMentionSuggestions([]);
+      return;
+    }
+
+    const threadComments = comments.filter((item) => {
+      return getThreadRootId(item) === threadRootId;
+    });
+
+    const seen = new Set<string>();
+
+    const suggestions = threadComments.filter((item) => {
+      const name = (item.user || "").trim();
+
+      if (!name) return false;
+
+      const key = name.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      if (query && !key.includes(query)) return false;
+
+      seen.add(key);
+      return true;
+    });
+
+    setMentionQuery(query);
+    setMentionSuggestions(suggestions.slice(0, 6));
+  };
+
+  const handleMentionSelect = (comment: ApiVideoComment) => {
+    const name = (comment.user || "").trim();
+
+    if (!name) return;
+
+    setNewComment((current) => {
+      const match = current.match(/(?:^|\\s)@([^\\s@]*)$/);
+
+      if (!match) {
+        return current;
+      }
+
+      const start = match.index ?? 0;
+      const prefix = current.slice(0, start);
+
+      return `${prefix}@${name} `;
+    });
+
+    setMentionQuery("");
+    setMentionSuggestions([]);
+  };
+
   const handleAddComment = async () => {
     const text = newComment.trim();
     if (!text || !user) return;
@@ -180,6 +264,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
       );
 
       setComments((prev) => [comment, ...prev]);
+
       setNewComment("");
       setReplyingTo(null);
     } catch {
@@ -304,6 +389,10 @@ const handlePlay = async () => {
       (item) => item.parentCommentId === comment.id,
     );
 
+    const isExpanded = expandedReplies[comment.id] === true;
+    const visibleReplies = isExpanded ? replies : replies.slice(0, 2);
+    const hiddenReplyCount = Math.max(replies.length - 2, 0);
+
     return (
       <View key={comment.id}>
         <View
@@ -322,10 +411,38 @@ const handlePlay = async () => {
 
           <View style={{ flex: 1 }}>
             <Text style={styles.commentUser}>{comment.user}</Text>
-            <Text style={styles.commentText}>{comment.text}</Text>
+
+            <Text style={styles.commentText}>
+              {comment.text.split(/(@[^\s@]+)/g).map((part, index) =>
+                part.startsWith("@") ? (
+                  <Text
+                    key={`${comment.id}-mention-${index}`}
+                    style={{
+                      color: "#F5A623",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {part}
+                  </Text>
+                ) : (
+                  <Text key={`${comment.id}-text-${index}`}>{part}</Text>
+                ),
+              )}
+            </Text>
 
             <TouchableOpacity
-              onPress={() => setReplyingTo(comment)}
+              onPress={() => {
+                setReplyingTo(comment);
+
+                const mention = `@${comment.user} `;
+                setNewComment((current) =>
+                  current.trim().length === 0
+                    ? mention
+                    : current.startsWith(mention)
+                      ? current
+                      : `${mention}${current}`,
+                );
+              }}
               style={{ marginTop: 6, alignSelf: "flex-start" }}
             >
               <Text
@@ -341,7 +458,67 @@ const handlePlay = async () => {
           </View>
         </View>
 
-        {replies.map((reply) => renderComment(reply, depth + 1))}
+        {replies.length > 0 && (
+          <View>
+            {visibleReplies.map((reply) =>
+              renderComment(reply, depth + 1),
+            )}
+
+            {hiddenReplyCount > 0 && !isExpanded && (
+              <TouchableOpacity
+                onPress={() =>
+                  setExpandedReplies((prev) => ({
+                    ...prev,
+                    [comment.id]: true,
+                  }))
+                }
+                style={{
+                  marginLeft: Math.min((depth + 1) * 28, 140) + 38,
+                  marginBottom: 10,
+                  alignSelf: "flex-start",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#F5A623",
+                    fontSize: 12,
+                    fontWeight: "700",
+                  }}
+                >
+                  {hiddenReplyCount === 1
+                    ? "और 1 जवाब देखीं"
+                    : `और ${hiddenReplyCount} जवाब देखीं`}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {isExpanded && replies.length > 2 && (
+              <TouchableOpacity
+                onPress={() =>
+                  setExpandedReplies((prev) => ({
+                    ...prev,
+                    [comment.id]: false,
+                  }))
+                }
+                style={{
+                  marginLeft: Math.min((depth + 1) * 28, 140) + 38,
+                  marginBottom: 10,
+                  alignSelf: "flex-start",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.6)",
+                    fontSize: 12,
+                    fontWeight: "600",
+                  }}
+                >
+                  जवाब समेटीं
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
     );
   };
@@ -553,9 +730,91 @@ const handlePlay = async () => {
                 </Text>
               </View>
 
-              <TouchableOpacity onPress={() => setReplyingTo(null)}>
+              <TouchableOpacity
+                onPress={() => {
+                  setReplyingTo(null);
+                  setMentionQuery("");
+                  setMentionSuggestions([]);
+                }}
+              >
                 <Feather name="x" size={18} color="#fff" />
               </TouchableOpacity>
+            </View>
+          )}
+
+          {mentionSuggestions.length > 0 && (
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginBottom: 6,
+                borderRadius: 10,
+                backgroundColor: "#242424",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.12)",
+                overflow: "hidden",
+              }}
+            >
+              {mentionSuggestions.map((suggestion) => (
+                <TouchableOpacity
+                  key={suggestion.id}
+                  activeOpacity={0.75}
+                  onPress={() => handleMentionSelect(suggestion)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    borderBottomWidth:
+                      suggestion.id ===
+                      mentionSuggestions[mentionSuggestions.length - 1].id
+                        ? 0
+                        : 1,
+                    borderBottomColor: "rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 15,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "rgba(245,166,35,0.16)",
+                      marginRight: 10,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#F5A623",
+                        fontWeight: "800",
+                      }}
+                    >
+                      {(suggestion.user || "?").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: "700",
+                      }}
+                    >
+                      @{suggestion.user}
+                    </Text>
+                    <Text
+                      style={{
+                        color: "rgba(255,255,255,0.45)",
+                        fontSize: 11,
+                        marginTop: 2,
+                      }}
+                    >
+                      थ्रेड में शामिल बा
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
@@ -569,7 +828,10 @@ const handlePlay = async () => {
               }
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={newComment}
-              onChangeText={setNewComment}
+              onChangeText={(value) => {
+                setNewComment(value);
+                updateMentionSuggestions(value);
+              }}
               onSubmitEditing={() => requireLogin(handleAddComment)}
             />
             <TouchableOpacity
