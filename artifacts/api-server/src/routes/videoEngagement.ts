@@ -34,7 +34,6 @@ router.get("/profile/saved-videos", requireUserAuth, async (req, res) => {
     const rows = await db
       .select({
         video: videosTable,
-        categoryName: usersTable.id,
       })
       .from(videoReactionsTable)
       .innerJoin(videosTable, eq(videoReactionsTable.videoId, videosTable.id))
