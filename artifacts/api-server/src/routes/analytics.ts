@@ -558,6 +558,10 @@ router.get("/admin/analytics/users", requireAdmin, async (req, res) => {
         email: u.email,
         authProvider: u.authProvider,
         createdAt: u.createdAt,
+        city: u.city,
+        region: u.region,
+        country: u.country,
+        lastLoginAt: u.lastLoginAt,
       })),
     });
   } catch (e) {

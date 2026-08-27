@@ -84,9 +84,36 @@ type AnalyticsUser = {
   email: string | null;
   authProvider: string;
   createdAt: string;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  lastLoginAt: string | null;
 };
 
 type UsersResponse = { total: number; page: number; pageSize: number; users: AnalyticsUser[] };
+
+// geoip-lite returns ISO 3166-2 subdivision codes (e.g. "MH") for India,
+// not full names — this is display-only sugar for the CMS table.
+const INDIA_STATE_NAMES: Record<string, string> = {
+  AP: "Andhra Pradesh", AR: "Arunachal Pradesh", AS: "Assam", BR: "Bihar",
+  CT: "Chhattisgarh", GA: "Goa", GJ: "Gujarat", HR: "Haryana",
+  HP: "Himachal Pradesh", JH: "Jharkhand", KA: "Karnataka", KL: "Kerala",
+  MP: "Madhya Pradesh", MH: "Maharashtra", MN: "Manipur", ML: "Meghalaya",
+  MZ: "Mizoram", NL: "Nagaland", OR: "Odisha", PB: "Punjab", RJ: "Rajasthan",
+  SK: "Sikkim", TN: "Tamil Nadu", TG: "Telangana", TR: "Tripura",
+  UP: "Uttar Pradesh", UT: "Uttarakhand", WB: "West Bengal",
+  DL: "Delhi", JK: "Jammu and Kashmir", LA: "Ladakh", PY: "Puducherry",
+  CH: "Chandigarh", AN: "Andaman and Nicobar Islands",
+  DN: "Dadra and Nagar Haveli and Daman and Diu", LD: "Lakshadweep",
+};
+
+function formatLocation(u: AnalyticsUser): string {
+  if (!u.city && !u.region && !u.country) return "—";
+  const regionName = u.region
+    ? (u.country === "IN" ? INDIA_STATE_NAMES[u.region] ?? u.region : u.region)
+    : null;
+  return [u.city, regionName, u.country].filter(Boolean).join(", ") || "—";
+}
 
 // Phase 2 — event-tracking-backed rows (mirror /admin/analytics/audio,
 // /admin/analytics/videos, /admin/analytics/downloads responses).
@@ -584,6 +611,7 @@ export default function Analytics() {
                       <TableHead>Phone</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Login Method</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Joined</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -599,12 +627,13 @@ export default function Analytics() {
                               {u.authProvider}
                             </Badge>
                           </TableCell>
+                          <TableCell>{formatLocation(u)}</TableCell>
                           <TableCell>{format(new Date(u.createdAt), "d MMM yyyy")}</TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                           कोई यूजर नइखे मिलल
                         </TableCell>
                       </TableRow>

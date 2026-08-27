@@ -9,6 +9,12 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Render sits in front of this app as a reverse proxy — without this,
+// req.ip resolves to Render's internal proxy address instead of the real
+// client IP, which breaks IP-based geolocation (see lib/geo.ts) and would
+// also break any future rate-limiting keyed on IP.
+app.set("trust proxy", true);
+
 app.use(
   pinoHttp({
     logger,

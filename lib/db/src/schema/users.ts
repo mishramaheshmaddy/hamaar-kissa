@@ -17,6 +17,16 @@ export const usersTable = pgTable("users", {
 
   authProvider: text("auth_provider").notNull().default("phone"),
   googleId: text("google_id"),
+
+  // IP-based geolocation, captured on each successful login (send-otp
+  // verification or Google sign-in). Approximate, city-level at best —
+  // never shown back to the user, admin/CMS use only.
+  lastIp: text("last_ip"),
+  city: text("city"),
+  region: text("region"), // ISO 3166-2 subdivision code, e.g. "MH", "UP"
+  country: text("country"), // ISO 3166-1 alpha-2, e.g. "IN"
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

@@ -3,6 +3,7 @@ import { eq, and, gt, or } from "drizzle-orm";
 import { db, usersTable, otpVerificationsTable } from "@workspace/db";
 import { sign, verify } from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import { getClientIp, lookupLocation } from "../lib/geo";
 
 const router = Router();
 
@@ -32,6 +33,27 @@ function normalizePhone(value: string): string {
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+// Captures an approximate location for this login from the request's IP —
+// best-effort only, never blocks or fails the login if it errors.
+async function recordLoginLocation(req: import("express").Request, userId: number) {
+  try {
+    const ip = getClientIp(req);
+    const geo = lookupLocation(ip);
+    await db
+      .update(usersTable)
+      .set({
+        lastIp: ip,
+        city: geo.city,
+        region: geo.region,
+        country: geo.country,
+        lastLoginAt: new Date(),
+      })
+      .where(eq(usersTable.id, userId));
+  } catch (e) {
+    console.error("recordLoginLocation error:", e);
+  }
 }
 
 function parseProfileDate(value: string): Date | null {
@@ -164,6 +186,7 @@ router.post("/auth/verify-otp", async (req, res) => {
   }
 
   const token = generateToken(user.id);
+  await recordLoginLocation(req, user.id);
   res.json({ token, user: toUserDto(user), isNewUser });
 });
 
@@ -231,6 +254,7 @@ router.post("/auth/google", async (req, res) => {
     }
 
     const token = generateToken(user.id);
+    await recordLoginLocation(req, user.id);
     res.json({ token, user: toUserDto(user), isNewUser });
   } catch {
     res.status(401).json({ error: "Invalid Google ID token" });
