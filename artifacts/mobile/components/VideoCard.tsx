@@ -121,6 +121,11 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const { user } = useAuth();
   const router = useRouter();
   const videoRef = useRef<Video>(null);
+  const reactionSavingRef = useRef(false);
+
+  useEffect(() => {
+    reactionSavingRef.current = reactionSaving;
+  }, [reactionSaving]);
 
   const handleShare = async () => {
     try {
@@ -171,6 +176,36 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     return () => { cancelled = true; };
   }, [video.id, user?.id]);
 
+  // Lightweight "close to real-time" sync: while this card is the one the
+  // user is actually looking at, periodically pull fresh counts/comments so
+  // likes/saves/comments from OTHER users show up without a manual reload —
+  // like/save/comment writes themselves are already immediate for the
+  // person taking the action; this just closes the gap for everyone else
+  // watching. Skipped while our own reaction PUT is in flight so it can't
+  // clobber the optimistic update with a stale read.
+  useEffect(() => {
+    if (!isActive) return;
+
+    const POLL_INTERVAL_MS = 8000;
+    const interval = setInterval(() => {
+      getVideoEngagement(Number(video.id))
+        .then((data) => {
+          setLikeCount(data.likes);
+          setComments(data.comments);
+          if (!reactionSavingRef.current) {
+            setLiked(data.liked);
+            setSaved(data.saved);
+          }
+        })
+        .catch(() => {
+          // A missed poll tick just means slightly stale counts until the
+          // next one — never worth surfacing to the user.
+        });
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isActive, video.id]);
+
   const getThreadRootId = (comment: ApiVideoComment): number => {
     let current = comment;
 
@@ -188,7 +223,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   };
 
   const updateMentionSuggestions = (value: string) => {
-    const match = value.match(/(?:^|\\s)@([^\\s@]*)$/);
+    const match = value.match(/(?:^|\s)@([^\s@]*)$/);
 
     if (!match) {
       setMentionQuery("");
@@ -236,7 +271,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
     if (!name) return;
 
     setNewComment((current) => {
-      const match = current.match(/(?:^|\\s)@([^\\s@]*)$/);
+      const match = current.match(/(?:^|\s)@([^\s@]*)$/);
 
       if (!match) {
         return current;
