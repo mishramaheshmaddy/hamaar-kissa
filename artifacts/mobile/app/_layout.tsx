@@ -31,7 +31,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   // Silently registers this device for push notifications on every app
   // start AND whenever login state changes (respecting whatever the user
@@ -40,8 +40,16 @@ function RootLayoutNav() {
   // specific phone number — the token gets tagged with whoever is
   // currently logged in on this device. Also wires up tap-to-open deep
   // linking so tapping a notification jumps straight to that story/video.
+  //
+  // Waits for authLoading to finish before running at all: AuthContext
+  // starts as `user: null` while it's still restoring the saved session
+  // from AsyncStorage, and firing this during that brief window would
+  // send phone: null to the server — wiping out a device's correctly
+  // tagged phone number every time the app cold-starts, even though the
+  // person is (and stays) logged in a moment later.
   useEffect(() => {
     if (Platform.OS === "web") return;
+    if (authLoading) return;
 
     (async () => {
       const stored = await loadStoredNotificationPrefs();
@@ -54,7 +62,7 @@ function RootLayoutNav() {
         });
       }
     })();
-  }, [user?.phone]);
+  }, [user?.phone, authLoading]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
