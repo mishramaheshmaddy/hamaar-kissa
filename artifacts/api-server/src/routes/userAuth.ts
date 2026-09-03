@@ -4,6 +4,7 @@ import { db, usersTable, otpVerificationsTable } from "@workspace/db";
 import { sign, verify } from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { getClientIp, lookupLocation } from "../lib/geo";
+import { normalizePhone } from "../lib/push";
 
 const router = Router();
 
@@ -25,10 +26,6 @@ export function verifyUserToken(token: string): { userId: number } | null {
   } catch {
     return null;
   }
-}
-
-function normalizePhone(value: string): string {
-  return value.replace(/\D/g, "").slice(-10);
 }
 
 function normalizeEmail(value: string): string {
@@ -164,6 +161,10 @@ router.post("/auth/verify-otp", async (req, res) => {
   await db.update(otpVerificationsTable).set({ isUsed: true }).where(eq(otpVerificationsTable.id, record.id));
 
   const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    res.status(400).json({ error: "Invalid phone number" });
+    return;
+  }
 
   // Always use the existing account when this phone number
   // is already linked to one.
@@ -372,6 +373,11 @@ router.put("/auth/profile", async (req, res) => {
     phone !== undefined && phone !== null && phone.trim() !== ""
       ? normalizePhone(phone)
       : undefined;
+
+  if (phone !== undefined && phone !== null && phone.trim() !== "" && !normalizedPhone) {
+    res.status(400).json({ error: "Invalid phone number" });
+    return;
+  }
 
   const normalizedEmail =
     email !== undefined && email !== null && email.trim() !== ""
