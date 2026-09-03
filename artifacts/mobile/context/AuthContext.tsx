@@ -50,6 +50,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (savedToken && savedUser) {
           setToken(savedToken);
           setUser(JSON.parse(savedUser));
+          // Re-fetch from the server before considering auth "settled".
+          // Restoring only from the cached copy meant any backend-side
+          // change to this user's profile (phone, name, etc. — e.g. a
+          // one-off data fix) would never reach an already-logged-in
+          // device until they explicitly logged out and back in. Other
+          // code (like push token registration) waits for isLoading to
+          // clear before trusting user.phone, so this keeps that
+          // guarantee meaningful.
+          await fetchUser();
         }
       } catch {}
       setIsLoading(false);
