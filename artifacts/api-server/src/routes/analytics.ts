@@ -412,34 +412,91 @@ router.get("/admin/analytics/categories", requireAdmin, async (_req, res) => {
 // ---------------------------------------------------------------------
 router.get("/admin/analytics/audio", requireAdmin, async (_req, res) => {
   try {
-    const [stories, playCounts, downloadCounts, likeCounts, saveCounts] = await Promise.all([
+    // like/save are toggles — a "like" can later be undone by a
+    // "like_removed" event (same for save/save_removed). A raw COUNT() of
+    // "like" rows keeps growing forever even after someone unlikes, so it
+    // drifts further and further from the true current count shown in the
+    // app (which only reflects each user's latest action). We dedupe the
+    // same way /analytics/story/:id already does: keep only each user's
+    // most recent like/save event per story, then count how many of those
+    // latest events are still "on".
+    const [stories, playCounts, downloadRows, reactionRows] = await Promise.all([
       db.select({ id: audioStoriesTable.id, title: audioStoriesTable.title }).from(audioStoriesTable),
       db
         .select({ contentId: analyticsEventsTable.contentId, c: count() })
         .from(analyticsEventsTable)
         .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "story_play")))
         .groupBy(analyticsEventsTable.contentId),
+      // Distinct users per story, not raw row count — otherwise someone
+      // re-downloading the same story multiple times would inflate this
+      // the same way repeated likes used to.
       db
-        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .selectDistinct({
+          contentId: analyticsEventsTable.contentId,
+          userId: analyticsEventsTable.userId,
+        })
         .from(analyticsEventsTable)
-        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "download")))
-        .groupBy(analyticsEventsTable.contentId),
+        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "download"))),
       db
-        .select({ contentId: analyticsEventsTable.contentId, c: count() })
+        .select({
+          contentId: analyticsEventsTable.contentId,
+          userId: analyticsEventsTable.userId,
+          eventType: analyticsEventsTable.eventType,
+        })
         .from(analyticsEventsTable)
-        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "like")))
-        .groupBy(analyticsEventsTable.contentId),
-      db
-        .select({ contentId: analyticsEventsTable.contentId, c: count() })
-        .from(analyticsEventsTable)
-        .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "save")))
-        .groupBy(analyticsEventsTable.contentId),
+        .where(
+          and(
+            eq(analyticsEventsTable.contentType, "story"),
+            or(
+              eq(analyticsEventsTable.eventType, "like"),
+              eq(analyticsEventsTable.eventType, "like_removed"),
+              eq(analyticsEventsTable.eventType, "save"),
+              eq(analyticsEventsTable.eventType, "save_removed"),
+            ),
+          ),
+        )
+        .orderBy(desc(analyticsEventsTable.id)),
     ]);
 
     const playMap = new Map(playCounts.map((r) => [r.contentId, r.c]));
-    const downloadMap = new Map(downloadCounts.map((r) => [r.contentId, r.c]));
-    const likeMap = new Map(likeCounts.map((r) => [r.contentId, r.c]));
-    const saveMap = new Map(saveCounts.map((r) => [r.contentId, r.c]));
+
+    const downloadMap = new Map<number, number>();
+    for (const row of downloadRows) {
+      if (row.contentId === null || row.userId === null) continue;
+      downloadMap.set(row.contentId, (downloadMap.get(row.contentId) ?? 0) + 1);
+    }
+
+    // key: `${storyId}:${userId}` -> latest eventType seen for that pair.
+    // Rows are ordered newest-first, so the first time we see a key wins.
+    const latestLikeByUser = new Map<string, string>();
+    const latestSaveByUser = new Map<string, string>();
+
+    for (const row of reactionRows) {
+      if (row.contentId === null || row.userId === null) continue;
+      const key = `${row.contentId}:${row.userId}`;
+
+      if (row.eventType === "like" || row.eventType === "like_removed") {
+        if (!latestLikeByUser.has(key)) latestLikeByUser.set(key, row.eventType);
+      }
+
+      if (row.eventType === "save" || row.eventType === "save_removed") {
+        if (!latestSaveByUser.has(key)) latestSaveByUser.set(key, row.eventType);
+      }
+    }
+
+    const likeMap = new Map<number, number>();
+    for (const [key, eventType] of latestLikeByUser) {
+      if (eventType !== "like") continue;
+      const storyId = Number(key.split(":")[0]);
+      likeMap.set(storyId, (likeMap.get(storyId) ?? 0) + 1);
+    }
+
+    const saveMap = new Map<number, number>();
+    for (const [key, eventType] of latestSaveByUser) {
+      if (eventType !== "save") continue;
+      const storyId = Number(key.split(":")[0]);
+      saveMap.set(storyId, (saveMap.get(storyId) ?? 0) + 1);
+    }
 
     const result = stories
       .map((s) => ({
