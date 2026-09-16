@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hamaar Kissa",
     "slug": "hamaar-kissa",
-    "version": "1.0.32",
+    "version": "1.0.33",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hamaarkissa",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.haamarkissa.app",
-      "versionCode": 34,
+      "versionCode": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
         "backgroundColor": "#E8530A"
