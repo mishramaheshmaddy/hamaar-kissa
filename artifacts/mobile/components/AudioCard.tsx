@@ -44,6 +44,12 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(n);
+}
+
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
 
@@ -435,6 +441,15 @@ export default function AudioCard({ story, onPress, isPlaying, compact, style }:
           {story.title}
         </Text>
 
+        {!!story.plays && (
+          <View style={styles.playsRow}>
+            <Feather name="headphones" size={12} color={colors.mutedForeground} />
+            <Text style={[styles.playsText, { color: colors.mutedForeground }]}>
+              {formatCount(story.plays)}
+            </Text>
+          </View>
+        )}
+
         {/* Action buttons row */}
         <View style={styles.actionsRow}>
           <TouchableOpacity onPress={handleLike} style={styles.actionBtn}>
@@ -808,6 +823,13 @@ const styles = StyleSheet.create({
   categoryBadge: { alignSelf: "flex-start", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   categoryText: { fontSize: 10, fontWeight: "600" },
   title: { fontSize: 13, fontWeight: "700", lineHeight: 18, minHeight: 36 },
+  playsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  playsText: { fontSize: 11, fontWeight: "600" },
   actionsRow: {
     flexDirection: "row",
     gap: 6,

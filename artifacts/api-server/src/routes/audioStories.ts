@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
-import { db, audioStoriesTable, categoriesTable } from "@workspace/db";
+import { and, count, eq } from "drizzle-orm";
+import { db, audioStoriesTable, categoriesTable, analyticsEventsTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
 import { syncHomeSectionAssignment, getHomeSectionIdForContent } from "../lib/homeSectionSync";
 import {
@@ -25,6 +25,16 @@ router.get("/audio-stories", async (req, res) => {
     .leftJoin(categoriesTable, eq(audioStoriesTable.categoryId, categoriesTable.id))
     .orderBy(audioStoriesTable.sortOrder, audioStoriesTable.id);
 
+  // Reuses the same analytics_events story_play data already powering the
+  // CMS's plays column — one grouped query for the whole list, not a
+  // per-story query.
+  const playCounts = await db
+    .select({ contentId: analyticsEventsTable.contentId, c: count() })
+    .from(analyticsEventsTable)
+    .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "story_play")))
+    .groupBy(analyticsEventsTable.contentId);
+  const playCountMap = new Map(playCounts.map((r) => [r.contentId, r.c]));
+
   const q = query.success ? query.data : undefined;
   const filtered = rows.filter((r) => {
     if (q?.published !== undefined && r.story.published !== q.published) return false;
@@ -34,7 +44,11 @@ router.get("/audio-stories", async (req, res) => {
     return true;
   });
 
-  res.json(filtered.map(({ story, categoryName }) => toDto(story, categoryName)));
+  res.json(
+    filtered.map(({ story, categoryName }) =>
+      toDto(story, categoryName, undefined, playCountMap.get(story.id) ?? 0),
+    ),
+  );
 });
 
 router.post("/audio-stories", requireAdmin, async (req, res) => {
@@ -69,7 +83,19 @@ router.get("/audio-stories/:id", async (req, res) => {
   // via the Home Section page's own picker never updates it), so resolve
   // the real current assignment from home_section_items for accuracy.
   const homeSectionId = await getHomeSectionIdForContent("audio", id);
-  res.json(toDto(rows[0].story, rows[0].categoryName, homeSectionId));
+
+  const [playRow] = await db
+    .select({ c: count() })
+    .from(analyticsEventsTable)
+    .where(
+      and(
+        eq(analyticsEventsTable.contentType, "story"),
+        eq(analyticsEventsTable.eventType, "story_play"),
+        eq(analyticsEventsTable.contentId, id),
+      ),
+    );
+
+  res.json(toDto(rows[0].story, rows[0].categoryName, homeSectionId, playRow?.c ?? 0));
 });
 
 router.patch("/audio-stories/:id", requireAdmin, async (req, res) => {
@@ -93,7 +119,12 @@ router.delete("/audio-stories/:id", requireAdmin, async (req, res) => {
   res.status(204).send();
 });
 
-function toDto(row: typeof audioStoriesTable.$inferSelect, categoryName: string | null | undefined, resolvedHomeSectionId?: number | null) {
+function toDto(
+  row: typeof audioStoriesTable.$inferSelect,
+  categoryName: string | null | undefined,
+  resolvedHomeSectionId?: number | null,
+  plays: number = 0,
+) {
   return {
     id: row.id,
     title: row.title,
@@ -109,6 +140,7 @@ function toDto(row: typeof audioStoriesTable.$inferSelect, categoryName: string 
     published: row.published,
     sortOrder: row.sortOrder,
     homeSectionId: resolvedHomeSectionId !== undefined ? resolvedHomeSectionId : (row.homeSectionId ?? null),
+    plays,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

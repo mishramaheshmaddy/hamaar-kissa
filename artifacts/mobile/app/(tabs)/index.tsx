@@ -47,6 +47,7 @@ function mapStory(s: ApiAudioStory, catMap: Record<number, string>): AudioStory 
     audioUrl: s.audioUrl
       ? (s.audioUrl.startsWith("/") ? `${BASE}${s.audioUrl}` : s.audioUrl)
       : "",
+    plays: s.plays ?? 0,
   };
 }
 
@@ -83,6 +84,7 @@ interface HomeSectionItem {
     audioUrl?: string;
     videoUrl?: string;
     type: string;
+    plays?: number;
   }>;
 }
 
@@ -267,6 +269,7 @@ export default function HomeScreen() {
               narrator: item.narrator ?? "",
               description: "",
               audioUrl: item.audioUrl ? (item.audioUrl.startsWith("/") ? `${BASE}${item.audioUrl}` : item.audioUrl) : undefined,
+              plays: item.plays ?? 0,
             };
             return (
               <AudioCard

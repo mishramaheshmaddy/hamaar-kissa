@@ -34,6 +34,7 @@ export interface ApiAudioStory {
   audioUrl: string;
   sourceType?: string;
   published?: boolean;
+  plays?: number;
 }
 
 export interface ApiAudioStoryStats {

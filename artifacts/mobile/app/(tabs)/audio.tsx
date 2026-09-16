@@ -38,6 +38,7 @@ function mapStory(s: ApiAudioStory, catName: string): AudioStory {
     audioUrl: s.audioUrl
       ? (s.audioUrl.startsWith("/") ? `${BASE}${s.audioUrl}` : s.audioUrl)
       : "",
+    plays: s.plays ?? 0,
   };
 }
 

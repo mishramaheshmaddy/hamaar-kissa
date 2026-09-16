@@ -28,6 +28,7 @@ export interface AudioStory {
   narrator: string;
   description: string;
   audioUrl?: string;
+  plays?: number;
 }
 
 interface AudioContextType {
@@ -103,6 +104,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards the "real play" count below — reset per playStory() call, set
+  // once the 12s threshold is crossed so we never fire trackEvent twice
+  // for the same listen, no matter how many status ticks follow.
+  const playCountedRef = useRef(false);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -338,7 +343,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       await unloadSound();
 
       setCurrentStory(story);
-      trackEvent("story_play", "story", story.id);
+      playCountedRef.current = false;
 
       AsyncStorage.setItem(
         "last_open_story",
@@ -379,6 +384,14 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
               setProgress(dur > 0 ? (pos / dur) * 100 : 0);
               setIsPlaying(status.isPlaying ?? false);
+
+              // Count a "real" play once the story has actually been
+              // playing for ~12s — not on tap, not on every re-render/
+              // status tick after that (guarded by the ref, not state).
+              if (status.isPlaying && pos >= 12000 && !playCountedRef.current) {
+                playCountedRef.current = true;
+                trackEvent("story_play", "story", story.id);
+              }
 
               if (status.isPlaying && pos > 0 && pos % 60000 < 1000) {
                 setListeningMinutes(prev => {

@@ -28,6 +28,12 @@ import { apiFetch, ApiAudioStory, ApiAudioStoryStats, getAudioStoryStats, getPla
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 const BASE = DOMAIN ? `https://${DOMAIN}` : "";
 
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(n);
+}
+
 function mapStory(s: ApiAudioStory): AudioStory {
   return {
     id: String(s.id),
@@ -44,6 +50,7 @@ function mapStory(s: ApiAudioStory): AudioStory {
     audioUrl: s.audioUrl
       ? (s.audioUrl.startsWith("/") ? `${BASE}${s.audioUrl}` : s.audioUrl)
       : "",
+    plays: s.plays ?? 0,
   };
 }
 
@@ -526,6 +533,12 @@ async function handleShare() {
         <View style={styles.titleBlock}>
           <Text style={styles.storyTitle}>{currentStory.title}</Text>
           <Text style={styles.narrator}>{currentStory.narrator}</Text>
+          {!!currentStory.plays && (
+            <View style={styles.playsRow}>
+              <Feather name="headphones" size={13} color="#fff" />
+              <Text style={styles.playsText}>{formatCount(currentStory.plays)}</Text>
+            </View>
+          )}
           <Text style={styles.description} numberOfLines={2}>
             {currentStory.description}
           </Text>
@@ -928,6 +941,8 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   narrator: { color: "rgba(255,255,255,0.8)", fontSize: 15, fontWeight: "600" },
+  playsRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  playsText: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: "600" },
   description: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 13,

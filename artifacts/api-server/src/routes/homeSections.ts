@@ -1,12 +1,19 @@
 import { Router } from "express";
-import { eq, desc, asc } from "drizzle-orm";
-import { db, homeSectionsTable, audioStoriesTable, videosTable, categoriesTable, homeSectionItemsTable } from "@workspace/db";
+import { eq, desc, asc, and, count } from "drizzle-orm";
+import { db, homeSectionsTable, audioStoriesTable, videosTable, categoriesTable, homeSectionItemsTable, analyticsEventsTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
 
 const router = Router();
 
 router.get("/home-sections", async (req, res) => {
   const sections = await db.select().from(homeSectionsTable).where(eq(homeSectionsTable.isActive, true)).orderBy(asc(homeSectionsTable.sortOrder));
+
+  const playCounts = await db
+    .select({ contentId: analyticsEventsTable.contentId, c: count() })
+    .from(analyticsEventsTable)
+    .where(and(eq(analyticsEventsTable.contentType, "story"), eq(analyticsEventsTable.eventType, "story_play")))
+    .groupBy(analyticsEventsTable.contentId);
+  const playCountMap = new Map(playCounts.map((r) => [r.contentId, r.c]));
 
   const result = await Promise.all(
     sections.map(async (section) => {
@@ -30,7 +37,7 @@ router.get("/home-sections", async (req, res) => {
               .limit(1);
             if (!rows.length) return null;
             const { story, categoryName } = rows[0];
-            return { id: story.id, title: story.title, categoryName: categoryName ?? null, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl ?? null, audioUrl: story.audioUrl, type: "audio" as const };
+            return { id: story.id, title: story.title, categoryName: categoryName ?? null, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl ?? null, audioUrl: story.audioUrl, plays: playCountMap.get(story.id) ?? 0, type: "audio" as const };
           } else {
             const rows = await db
               .select({ video: videosTable, categoryName: categoriesTable.label })
@@ -61,6 +68,7 @@ router.get("/home-sections", async (req, res) => {
             durationSeconds: story.durationSeconds,
             thumbnailUrl: story.thumbnailUrl ?? null,
             audioUrl: story.audioUrl,
+            plays: playCountMap.get(story.id) ?? 0,
             type: "audio",
           }));
         } else if (section.type === "video") {
@@ -103,6 +111,7 @@ router.get("/home-sections", async (req, res) => {
               durationSeconds: story.durationSeconds,
               thumbnailUrl: story.thumbnailUrl ?? null,
               audioUrl: story.audioUrl,
+            plays: playCountMap.get(story.id) ?? 0,
               type: "audio" as const,
             })),
             ...videoRows.map(({ video, categoryName }) => ({
@@ -132,6 +141,7 @@ router.get("/home-sections", async (req, res) => {
             durationSeconds: story.durationSeconds,
             thumbnailUrl: story.thumbnailUrl ?? null,
             audioUrl: story.audioUrl,
+            plays: playCountMap.get(story.id) ?? 0,
             type: "audio" as const,
           })));
         }
@@ -168,6 +178,7 @@ router.get("/home-sections", async (req, res) => {
             durationSeconds: story.durationSeconds,
             thumbnailUrl: story.thumbnailUrl ?? null,
             audioUrl: story.audioUrl,
+            plays: playCountMap.get(story.id) ?? 0,
             type: "audio" as const,
           })));
         }
@@ -205,7 +216,7 @@ router.get("/home-sections", async (req, res) => {
               .limit(1);
             if (!rows.length) return null;
             const { story, categoryName } = rows[0];
-            return { id: story.id, title: story.title, categoryName: categoryName ?? null, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl ?? null, audioUrl: story.audioUrl, type: "audio" as const };
+            return { id: story.id, title: story.title, categoryName: categoryName ?? null, narrator: story.narrator, durationSeconds: story.durationSeconds, thumbnailUrl: story.thumbnailUrl ?? null, audioUrl: story.audioUrl, plays: playCountMap.get(story.id) ?? 0, type: "audio" as const };
           } else {
             const rows = await db
               .select({ video: videosTable, categoryName: categoriesTable.label })
@@ -237,6 +248,7 @@ router.get("/home-sections", async (req, res) => {
             durationSeconds: story.durationSeconds,
             thumbnailUrl: story.thumbnailUrl ?? null,
             audioUrl: story.audioUrl,
+            plays: playCountMap.get(story.id) ?? 0,
             type: "audio" as const,
           })));
         }
