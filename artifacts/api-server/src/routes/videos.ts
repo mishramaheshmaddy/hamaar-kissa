@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, videosTable, categoriesTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
+import { maybeNotifyNewContent } from "../lib/push";
 import { syncHomeSectionAssignment, getHomeSectionIdForContent } from "../lib/homeSectionSync";
 import {
   CreateVideoBody,
@@ -49,6 +50,9 @@ router.post("/videos", requireAdmin, async (req, res) => {
     homeSectionId: body.homeSectionId ?? null,
   }).returning();
   await syncHomeSectionAssignment("video", row.id, row.homeSectionId);
+  if (row.published) {
+    await maybeNotifyNewContent("video", row.id, row.title, row.thumbnailUrl);
+  }
   res.status(201).json(toDto(row, null));
 });
 
@@ -70,11 +74,18 @@ router.get("/videos/:id", async (req, res) => {
 router.patch("/videos/:id", requireAdmin, async (req, res) => {
   const { id } = UpdateVideoParams.parse({ id: Number(req.params.id) });
   const body = UpdateVideoBody.parse(req.body);
+
+  const [before] = await db.select({ published: videosTable.published }).from(videosTable).where(eq(videosTable.id, id));
+  const wasPublished = before?.published ?? false;
+
   const updateData: Record<string, unknown> = { ...body, updatedAt: new Date() };
   const [row] = await db.update(videosTable).set(updateData).where(eq(videosTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   if ("homeSectionId" in body) {
     await syncHomeSectionAssignment("video", row.id, row.homeSectionId);
+  }
+  if (row.published && !wasPublished) {
+    await maybeNotifyNewContent("video", row.id, row.title, row.thumbnailUrl);
   }
   res.json(toDto(row, null));
 });

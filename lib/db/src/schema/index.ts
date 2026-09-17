@@ -9,6 +9,7 @@ export * from "./pushTokens";
 export * from "./notificationSettings";
 export * from "./scheduledNotifications";
 export * from "./analyticsEvents";
+export * from "./contentPublishEvents";
 
 export * from "./playlists";
 export * from "./videoReactions";

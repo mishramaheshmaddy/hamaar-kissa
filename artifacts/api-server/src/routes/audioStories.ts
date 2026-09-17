@@ -2,6 +2,7 @@ import { Router } from "express";
 import { and, count, eq } from "drizzle-orm";
 import { db, audioStoriesTable, categoriesTable, analyticsEventsTable } from "@workspace/db";
 import { requireAdmin } from "./auth";
+import { maybeNotifyNewContent } from "../lib/push";
 import { syncHomeSectionAssignment, getHomeSectionIdForContent } from "../lib/homeSectionSync";
 import {
   CreateAudioStoryBody,
@@ -68,6 +69,9 @@ router.post("/audio-stories", requireAdmin, async (req, res) => {
     homeSectionId: body.homeSectionId ?? null,
   }).returning();
   await syncHomeSectionAssignment("audio", row.id, row.homeSectionId);
+  if (row.published) {
+    await maybeNotifyNewContent("audio", row.id, row.title, row.thumbnailUrl);
+  }
   res.status(201).json(toDto(row, null));
 });
 
@@ -101,6 +105,16 @@ router.get("/audio-stories/:id", async (req, res) => {
 router.patch("/audio-stories/:id", requireAdmin, async (req, res) => {
   const { id } = UpdateAudioStoryParams.parse({ id: Number(req.params.id) });
   const body = UpdateAudioStoryBody.parse(req.body);
+
+  // Needed to tell "draft becoming published" (should notify) apart from
+  // "editing an already-published story" (title/thumbnail fix, etc. —
+  // must NOT re-trigger a notification).
+  const [before] = await db
+    .select({ published: audioStoriesTable.published })
+    .from(audioStoriesTable)
+    .where(eq(audioStoriesTable.id, id));
+  const wasPublished = before?.published ?? false;
+
   const updateData: Record<string, unknown> = { ...body, updatedAt: new Date() };
   const [row] = await db.update(audioStoriesTable).set(updateData).where(eq(audioStoriesTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -109,6 +123,9 @@ router.patch("/audio-stories/:id", requireAdmin, async (req, res) => {
   // homeSectionId shouldn't accidentally wipe an existing assignment.
   if ("homeSectionId" in body) {
     await syncHomeSectionAssignment("audio", row.id, row.homeSectionId);
+  }
+  if (row.published && !wasPublished) {
+    await maybeNotifyNewContent("audio", row.id, row.title, row.thumbnailUrl);
   }
   res.json(toDto(row, null));
 });

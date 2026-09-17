@@ -1,5 +1,5 @@
-import { db, pushTokensTable, audioStoriesTable, videosTable } from "@workspace/db";
-import { inArray, isNotNull, eq } from "drizzle-orm";
+import { db, pushTokensTable, audioStoriesTable, videosTable, contentPublishEventsTable } from "@workspace/db";
+import { inArray, isNotNull, eq, count } from "drizzle-orm";
 import { logger } from "./logger";
 
 // Assumes India-only phone numbers (+91), consistent with the rest of this
@@ -164,4 +164,84 @@ export async function sendPushToTokens(
   }
 
   return { sent, failed };
+}
+
+/**
+ * Call this exactly when a piece of content (audio story or video)
+ * genuinely transitions to published=true — at creation (POST with
+ * published: true) or later (PATCH flipping a draft to published). Not on
+ * every edit — the caller is responsible for only invoking this on a real
+ * false→true transition (or brand-new row created already published).
+ *
+ * Records the publish event in content_publish_events (idempotent via a
+ * unique constraint on contentType+contentId — a retried/duplicate call
+ * for the same content ID is a no-op), then checks whether this is the
+ * 1st, 11th, 21st... genuinely-published item of this type, and if so,
+ * sends the new-content push notification to eligible devices.
+ *
+ * contentType and contentId identify the content itself; title is used
+ * only for the audio notification's exact wording (unused for video, per
+ * the product spec's fixed video notification text).
+ */
+export async function maybeNotifyNewContent(
+  contentType: "audio" | "video",
+  contentId: number,
+  title: string,
+  thumbnailUrl: string | null | undefined,
+): Promise<{ notified: boolean; sent?: number; failed?: number }> {
+  try {
+    const inserted = await db
+      .insert(contentPublishEventsTable)
+      .values({ contentType, contentId })
+      .onConflictDoNothing({ target: [contentPublishEventsTable.contentType, contentPublishEventsTable.contentId] })
+      .returning({ id: contentPublishEventsTable.id });
+
+    // Already recorded before (a retry, or this content was already
+    // processed) — never re-count or re-notify for the same content ID.
+    if (inserted.length === 0) {
+      return { notified: false };
+    }
+
+    const [{ c: publishedCount }] = await db
+      .select({ c: count() })
+      .from(contentPublishEventsTable)
+      .where(eq(contentPublishEventsTable.contentType, contentType));
+
+    // 1st, 11th, 21st, 31st... i.e. (count - 1) is a multiple of 10.
+    const isTrigger = (publishedCount - 1) % 10 === 0;
+    if (!isTrigger) {
+      return { notified: false };
+    }
+
+    const prefColumn = contentType === "audio" ? pushTokensTable.notifyNewStories : pushTokensTable.notifyNewVideos;
+    const eligible = await db
+      .select({ token: pushTokensTable.token })
+      .from(pushTokensTable)
+      .where(eq(prefColumn, true));
+    const tokens = eligible.map((r) => r.token);
+
+    if (tokens.length === 0) {
+      return { notified: false };
+    }
+
+    const body =
+      contentType === "audio"
+        ? `हमार किस्सा में आ गईल नया कहानी, ${title}, क्लिक करी आ अभीयें सुनी`
+        : `हमार किस्सा में आ गईल नया Video, क्लिक करी आ अभीयें देखि`;
+
+    const result = await sendPushToTokens(
+      tokens,
+      "हमार किस्सा",
+      body,
+      { type: contentType, id: String(contentId) },
+      thumbnailUrl ?? undefined,
+    );
+
+    return { notified: true, ...result };
+  } catch (e) {
+    // A notification failure must never break content creation/publish
+    // itself — the CMS save already succeeded by the time this runs.
+    logger.error({ err: e, contentType, contentId }, "maybeNotifyNewContent failed");
+    return { notified: false };
+  }
 }
