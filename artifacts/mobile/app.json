@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hamaar Kissa",
     "slug": "hamaar-kissa",
-    "version": "1.0.33",
+    "version": "1.0.34",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hamaarkissa",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.haamarkissa.app",
-      "versionCode": 35,
+      "versionCode": 36,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
         "backgroundColor": "#E8530A"
@@ -75,6 +75,7 @@
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-firebase/messaging",
+      "expo-notifications",
       "@react-native-google-signin/google-signin",
       "expo-updates"
     ],

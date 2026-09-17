@@ -138,7 +138,10 @@ export async function sendPushToTokens(
         data,
         android: {
           priority: "high",
-          ...(imageUrl ? { notification: { imageUrl } } : {}),
+          notification: {
+            channelId: "new-content",
+            ...(imageUrl ? { imageUrl } : {}),
+          },
         },
         apns: imageUrl ? { fcmOptions: { imageUrl } } : undefined,
       });
@@ -237,7 +240,19 @@ export async function maybeNotifyNewContent(
       thumbnailUrl ?? undefined,
     );
 
-    return { notified: true, ...result };
+    logger.info(
+  {
+    contentType,
+    contentId,
+    publishedCount,
+    eligibleTokens: tokens.length,
+    sent: result.sent,
+    failed: result.failed,
+  },
+  "new-content push notification completed",
+);
+
+return { notified: true, ...result };
   } catch (e) {
     // A notification failure must never break content creation/publish
     // itself — the CMS save already succeeded by the time this runs.
