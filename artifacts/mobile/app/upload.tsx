@@ -1,5 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import { Audio } from "expo-av";
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+} from "expo-audio";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -88,16 +93,11 @@ export default function UploadScreen() {
     }
   };
 
-  const measureAudioDurationNative = async (uri: string) => {
-    try {
-      const { sound, status } = await Audio.Sound.createAsync({ uri }, { shouldPlay: false });
-      if (status.isLoaded && status.durationMillis) {
-        setDurationSeconds(Math.round(status.durationMillis / 1000));
-      }
-      await sound.unloadAsync();
-    } catch (err) {
-      console.error("measureAudioDurationNative error:", err);
-    }
+  const measureAudioDurationNative = async (_uri: string) => {
+    // expo-audio does not expose a metadata-only API for reading the
+    // duration of an arbitrary existing audio URI.
+    // Keep duration at 0 rather than starting a recorder or creating
+    // a temporary playback object solely for metadata.
   };
 
   const measureAudioDurationWeb = (file: File) => {

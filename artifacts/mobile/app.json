@@ -17,7 +17,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.haamarkissa.app",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -50,7 +52,10 @@
               "pathPrefix": "/content"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -66,18 +71,19 @@
       ],
       "expo-font",
       "expo-web-browser",
-      [
-        "expo-av",
-        {
-          "microphonePermission": false
-        }
-      ],
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-firebase/messaging",
       "expo-notifications",
       "@react-native-google-signin/google-signin",
-      "expo-updates"
+      "expo-updates",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

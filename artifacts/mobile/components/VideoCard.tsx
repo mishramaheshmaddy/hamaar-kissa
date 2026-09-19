@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
-import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useRef, useState } from "react";
@@ -120,7 +120,17 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const [mentionSuggestions, setMentionSuggestions] = useState<ApiVideoComment[]>([]);
   const { user } = useAuth();
   const router = useRouter();
-  const videoRef = useRef<Video>(null);
+  const localVideoUrl = video.videoUrl
+    ? (
+        video.videoUrl.startsWith("http")
+          ? video.videoUrl
+          : `${process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : ""}${video.videoUrl}`
+      )
+    : null;
+
+  const videoPlayer = useVideoPlayer(localVideoUrl ?? "", (player) => {
+    player.loop = true;
+  });
   const reactionSavingRef = useRef(false);
 
   useEffect(() => {
@@ -308,7 +318,7 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   };
 
   // Pause (and fully unload) as soon as this card scrolls off-screen —
-  // without this, expo-av keeps playing in the background indefinitely,
+  // without this, existing video playback keeps playing in the background indefinitely,
   // even after leaving the Video tab or backgrounding the whole app.
   useEffect(() => {
     if (!isActive && started) {
@@ -362,13 +372,9 @@ export default function VideoCard({ video, isActive }: VideoCardProps) {
   const icon = (video.categoryId && CATEGORY_ID_ICONS[video.categoryId]) ?? "🎬";
 
   
-  const stopVideo = async () => {
+  const stopVideo = () => {
     try {
-      await videoRef.current?.stopAsync();
-    } catch {}
-
-    try {
-      await videoRef.current?.unloadAsync();
+      videoPlayer.pause();
     } catch {}
 
     setIsPlaying(false);
@@ -392,32 +398,20 @@ const handlePlay = async () => {
     }
   };
 
-  const togglePlayPause = async () => {
-    if (isPlaying) {
-      await videoRef.current?.pauseAsync().catch(() => {});
+  const togglePlayPause = () => {
+    if (videoPlayer.playing) {
+      videoPlayer.pause();
       setIsPlaying(false);
       setShowPauseIcon(true);
     } else {
-      await videoRef.current?.playAsync().catch(() => {});
+      videoPlayer.play();
       setIsPlaying(true);
       setShowPauseIcon(false);
     }
   };
 
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (status.isLoaded) {
-      setIsPlaying(status.isPlaying);
-    }
-  };
 
-  const getLocalVideoUrl = () => {
-    if (!video.videoUrl) return null;
-    if (video.videoUrl.startsWith("http")) return video.videoUrl;
-    // If video URL is a relative path like /api/media/files/xxx, resolve against the API base
-    const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
-    const BASE = DOMAIN ? `https://${DOMAIN}` : "";
-    return `${BASE}${video.videoUrl}`;
-  };
+
 
   const renderComment = (comment: ApiVideoComment, depth = 0): React.ReactNode => {
     const replies = comments.filter(
@@ -567,15 +561,11 @@ const handlePlay = async () => {
       {started && video.videoUrl ? (
         <TouchableWithoutFeedback onPress={togglePlayPause}>
           <View style={styles.playerContainer}>
-            <Video
-              ref={videoRef}
-              source={{ uri: getLocalVideoUrl() ?? "" }}
-              shouldPlay={isPlaying && isActive}
-              isLooping
-              resizeMode={ResizeMode.COVER}
+            <VideoView
+              player={videoPlayer}
               style={styles.player}
-              useNativeControls={false}
-              onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+              nativeControls={false}
+              contentFit="cover"
             />
             {/* Minimal center play/pause icon — Reels-style, no persistent bar */}
             {(showPauseIcon || !isPlaying) && (

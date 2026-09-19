@@ -1,6 +1,23 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from "expo-av";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
+} from "expo-audio";
 import { Alert, DeviceEventEmitter } from "react-native";
+
+function updatePlayerLockScreenMetadata(
+  player: AudioPlayer,
+  story: AudioStory,
+) {
+  player.updateLockScreenMetadata({
+    title: story.title,
+    artist: story.narrator || "Hamaar Kissa",
+    albumTitle: "Hamaar Kissa",
+    artworkUrl: story.thumbnail || undefined,
+  });
+}
+
 import { getLocalPath, isDownloaded } from "@/lib/downloadManager";
 import { apiFetch, trackEvent, ApiAudioStory } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -102,7 +119,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [completedStories, setCompletedStories] = useState(0);
   const [listeningStreak, setListeningStreak] = useState(0);
 
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
+  const playbackSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards the "real play" count below — reset per playStory() call, set
   // once the 12s threshold is crossed so we never fire trackEvent twice
@@ -110,18 +128,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playCountedRef = useRef(false);
 
   useEffect(() => {
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      staysActiveInBackground: true,
-      playsInSilentModeIOS: true,
-      // Gmail/Calendar/etc. never request audio focus (no sound), so
-      // playback continues uninterrupted there. The moment an app that
-      // DOES play sound — YouTube, Instagram, Spotify, a phone call —
-      // requests audio focus, DoNotMix tells the OS to stop us rather
-      // than mix or duck underneath it.
-      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-      shouldDuckAndroid: false,
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: "doNotMix",
     }).catch(() => {});
   }, []);
 
@@ -208,10 +218,22 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   }, [queue, currentQueueIndex]);
 
   const unloadSound = useCallback(async () => {
+    if (playbackSubscriptionRef.current) {
+      try {
+        playbackSubscriptionRef.current.remove();
+      } catch {}
+      playbackSubscriptionRef.current = null;
+    }
+
     if (soundRef.current) {
       try {
-        await soundRef.current.unloadAsync();
+        soundRef.current.clearLockScreenControls();
       } catch {}
+
+      try {
+        soundRef.current.remove();
+      } catch {}
+
       soundRef.current = null;
     }
   }, []);
@@ -382,118 +404,161 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const { sound } = await Audio.Sound.createAsync(
+        const sound = createAudioPlayer(
           { uri },
-          { shouldPlay: true, rate: speed },
-          (status) => {
-            if (status.isLoaded) {
-              const dur = status.durationMillis ?? story.duration * 1000;
-              const pos = status.positionMillis ?? 0;
-
-              setProgress(dur > 0 ? (pos / dur) * 100 : 0);
-              setIsPlaying(status.isPlaying ?? false);
-
-              // Count a "real" play once the story has actually been
-              // playing for ~12s — not on tap, not on every re-render/
-              // status tick after that (guarded by the ref, not state).
-              if (status.isPlaying && pos >= 12000 && !playCountedRef.current) {
-                playCountedRef.current = true;
-                trackEvent("story_play", "story", story.id);
-              }
-
-              if (status.isPlaying && pos > 0 && pos % 60000 < 1000) {
-                setListeningMinutes(prev => {
-                  const next = prev + 1;
-                  AsyncStorage.setItem(
-                    "listening_minutes",
-                    String(next)
-                  ).catch(() => {});
-                  return next;
-                });
-              }
-
-              AsyncStorage.multiSet([
-                ["audio_current_story", story.id],
-                ["audio_playback_position", String(pos)],
-                ["audio_was_playing", String(status.isPlaying ?? false)],
-                [`progress_${story.id}`, String(pos)],
-              ]).catch(() => {});
-              if (status.didJustFinish) {
-                setProgress(100);
-
-                setCompletedStories(prev => {
-                  const next = prev + 1;
-                  AsyncStorage.setItem(
-                    "completed_stories",
-                    String(next)
-                  ).catch(() => {});
-                  return next;
-                });
-
-                (async () => {
-                  const today = new Date().toISOString().slice(0,10);
-
-                  const lastDay =
-                    await AsyncStorage.getItem("last_listening_day");
-
-                  if (lastDay !== today) {
-
-                    const streak =
-                      Number(
-                        await AsyncStorage.getItem(
-                          "listening_streak"
-                        )
-                      ) || 0;
-
-                    const next = streak + 1;
-
-                    setListeningStreak(next);
-
-                    await AsyncStorage.multiSet([
-                      ["listening_streak", String(next)],
-                      ["last_listening_day", today],
-                    ]);
-                  }
-                })().catch(() => {});
-
-                setCurrentQueueIndex((index) => {
-
-                  if (repeatMode === "one") {
-                    playStory(story);
-                    return index;
-                  }
-
-                  if (shuffle && queue.length > 1) {
-                    const next =
-                      Math.floor(Math.random() * queue.length);
-
-                    return next;
-                  }
-
-                  if (index >= 0 && index + 1 < queue.length) {
-                    return index + 1;
-                  }
-
-                  if (repeatMode === "all" && queue.length > 0) {
-                    return 0;
-                  }
-
-                  // No queued item: normal standalone audio should
-                  // continue automatically with another published story.
-                  if (queue.length === 0) {
-                    playRandomNextStory(story.id);
-                    return index;
-                  }
-
-                  // An explicit finite queue has finished.
-                  setIsPlaying(false);
-                  return index;
-                });
-              }
-            }
-          }
+          { updateInterval: 500 },
         );
+
+        sound.playbackRate = speed;
+        sound.loop = repeatMode === "one";
+
+        updatePlayerLockScreenMetadata(sound, story);
+
+        playbackSubscriptionRef.current = sound.addListener(
+          "playbackStatusUpdate",
+          (status) => {
+            const currentTime = status.currentTime ?? 0;
+            const duration = status.duration ?? story.duration ?? 0;
+            const playing = status.playing ?? false;
+
+            if (!status.isLoaded) {
+              return;
+            }
+
+            setProgress(
+              duration > 0
+                ? (currentTime / duration) * 100
+                : 0
+            );
+
+            setIsPlaying(playing);
+
+            // Count a real play only after ~12 seconds of actual playback.
+            if (
+              playing &&
+              currentTime >= 12 &&
+              !playCountedRef.current
+            ) {
+              playCountedRef.current = true;
+              trackEvent("story_play", "story", story.id);
+            }
+
+            // Count listening minutes using native seconds.
+            if (
+              playing &&
+              currentTime > 0 &&
+              currentTime % 60 < 0.5
+            ) {
+              setListeningMinutes((prev) => {
+                const next = prev + 1;
+
+                AsyncStorage.setItem(
+                  "listening_minutes",
+                  String(next)
+                ).catch(() => {});
+
+                return next;
+              });
+            }
+
+            AsyncStorage.multiSet([
+              ["audio_current_story", story.id],
+              ["audio_playback_position", String(currentTime * 1000)],
+              ["audio_was_playing", String(playing)],
+              [`progress_${story.id}`, String(currentTime * 1000)],
+            ]).catch(() => {});
+
+            if (status.didJustFinish && repeatMode !== "one") {
+              setProgress(100);
+
+              setCompletedStories((prev) => {
+                const next = prev + 1;
+
+                AsyncStorage.setItem(
+                  "completed_stories",
+                  String(next)
+                ).catch(() => {});
+
+                return next;
+              });
+
+              (async () => {
+                const today = new Date().toISOString().slice(0, 10);
+
+                const lastDay =
+                  await AsyncStorage.getItem("last_listening_day");
+
+                if (lastDay !== today) {
+                  const streak =
+                    Number(
+                      await AsyncStorage.getItem(
+                        "listening_streak"
+                      )
+                    ) || 0;
+
+                  const next = streak + 1;
+
+                  setListeningStreak(next);
+
+                  await AsyncStorage.multiSet([
+                    ["listening_streak", String(next)],
+                    ["last_listening_day", today],
+                  ]);
+                }
+              })().catch(() => {});
+
+              setCurrentQueueIndex((index) => {
+                if (shuffle && queue.length > 1) {
+                  return Math.floor(
+                    Math.random() * queue.length
+                  );
+                }
+
+                if (
+                  index >= 0 &&
+                  index + 1 < queue.length
+                ) {
+                  return index + 1;
+                }
+
+                if (
+                  repeatMode === "all" &&
+                  queue.length > 0
+                ) {
+                  return 0;
+                }
+
+                // No queued item: automatically continue with
+                // another published story.
+                if (queue.length === 0) {
+                  playRandomNextStory(story.id);
+                  return index;
+                }
+
+                // Explicit finite queue has finished.
+                setIsPlaying(false);
+                return index;
+              });
+            }
+          },
+        );
+
+        sound.setActiveForLockScreen(
+          true,
+          {
+            title: story.title,
+            artist: story.narrator || "Hamaar Kissa",
+            albumTitle: "Hamaar Kissa",
+            artworkUrl: story.thumbnail || undefined,
+          },
+          {
+            showSeekBackward: true,
+            showSeekForward: true,
+          },
+        );
+
         soundRef.current = sound;
+        sound.play();
 
         try {
           const values = await AsyncStorage.multiGet([
@@ -517,10 +582,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
             savedStory === story.id &&
             savedPosition > 0
           ) {
-            await sound.setPositionAsync(savedPosition);
+            sound.seekTo(savedPosition / 1000);
 
             if (!wasPlaying) {
-              await sound.pauseAsync();
+              sound.pause();
               setIsPlaying(false);
             } else {
               setIsPlaying(true);
@@ -659,13 +724,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const togglePlay = useCallback(async () => {
     if (soundRef.current) {
       try {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          if (status.isPlaying) {
-            await soundRef.current.pauseAsync();
+        if (soundRef.current.isLoaded) {
+          if (soundRef.current.playing) {
+            soundRef.current.pause();
             setIsPlaying(false);
           } else {
-            await soundRef.current.playAsync();
+            soundRef.current.play();
             setIsPlaying(true);
           }
         }
@@ -684,9 +748,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const pauseAudio = useCallback(async () => {
     if (soundRef.current) {
       try {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded && status.isPlaying) {
-          await soundRef.current.pauseAsync();
+        const status = soundRef.current;
+        if (status?.isLoaded && status.playing) {
+          soundRef.current.pause();
         }
       } catch {}
     }
@@ -696,10 +760,13 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const seekForward = useCallback(async () => {
     if (soundRef.current) {
       try {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          const newPos = Math.min((status.positionMillis ?? 0) + 10000, status.durationMillis ?? 0);
-          await soundRef.current.setPositionAsync(newPos);
+        const status = soundRef.current;
+        if (status?.isLoaded) {
+          const newPos = Math.min(
+            (status.currentTime ?? 0) * 1000 + 10000,
+            (status.duration ?? 0) * 1000,
+          );
+          soundRef.current.seekTo(newPos / 1000);
         }
       } catch {}
     }
@@ -708,10 +775,13 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const seekBackward = useCallback(async () => {
     if (soundRef.current) {
       try {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          const newPos = Math.max((status.positionMillis ?? 0) - 10000, 0);
-          await soundRef.current.setPositionAsync(newPos);
+        const status = soundRef.current;
+        if (status?.isLoaded) {
+          const newPos = Math.max(
+            (status.currentTime ?? 0) * 1000 - 10000,
+            0,
+          );
+          soundRef.current.seekTo(newPos / 1000);
         }
       } catch {}
     }
@@ -721,17 +791,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!soundRef.current) return;
 
     try {
-      const status = await soundRef.current.getStatusAsync();
+      if (!soundRef.current.isLoaded) return;
 
-      if (!status.isLoaded) return;
-
-      const duration = status.durationMillis ?? 0;
+      const duration = soundRef.current.duration * 1000;
       const requested = Math.max(0, positionSeconds * 1000);
       const newPos = duration > 0
         ? Math.min(requested, duration)
         : requested;
 
-      await soundRef.current.setPositionAsync(newPos);
+      soundRef.current.seekTo(newPos / 1000);
 
       if (duration > 0) {
         setProgress((newPos / duration) * 100);
@@ -744,7 +812,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("audio_speed", String(s)).catch(() => {});
     if (soundRef.current) {
       try {
-        await soundRef.current.setRateAsync(s, true);
+        soundRef.current.playbackRate = s;
       } catch {}
     }
   }, []);
