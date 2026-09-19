@@ -409,7 +409,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
           { updateInterval: 500 },
         );
 
-        sound.playbackRate = speed;
         sound.loop = repeatMode === "one";
 
         updatePlayerLockScreenMetadata(sound, story);
