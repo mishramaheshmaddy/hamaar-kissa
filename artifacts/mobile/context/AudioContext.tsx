@@ -227,6 +227,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
     if (soundRef.current) {
       try {
+        soundRef.current.pause();
+      } catch {}
+
+      try {
         soundRef.current.clearLockScreenControls();
       } catch {}
 
