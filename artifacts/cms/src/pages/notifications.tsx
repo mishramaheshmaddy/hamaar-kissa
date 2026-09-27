@@ -466,7 +466,18 @@ export default function Notifications() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to send");
       const unmatchedNote = data.unmatched?.length ? ` — ${data.unmatched.length} नंबर के app नइखे मिलल` : "";
-      toast({ title: `भेज दिहल गइल — ${data.recipients} device${unmatchedNote}` });
+      if (data.sent > 0) {
+        const failedNote = data.failed > 0 ? ` (${data.failed} फेल भइल)` : "";
+        toast({ title: `भेज दिहल गइल — ${data.sent}/${data.recipients} device${failedNote}${unmatchedNote}` });
+      } else if (data.recipients === 0) {
+        toast({ title: "कवनो device रजिस्टर नइखे", description: "notification भेजे लायक कवनो device नइखे मिलल", variant: "destructive" });
+      } else {
+        toast({
+          title: "भेजल नइखे भइल",
+          description: `${data.recipients} device टारगेट कइल गइल बा, बाकिर 0 पर पहुंचल — Firebase/server सेटिंग चेक करीं`,
+          variant: "destructive",
+        });
+      }
       resetManualForm();
       loadHistory();
     } catch (e) {
