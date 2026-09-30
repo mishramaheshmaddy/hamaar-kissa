@@ -262,6 +262,8 @@ export async function maybeNotifyNewContent(
       .set({
         status: result.sent > 0 ? "sent" : "failed",
         sentAt: result.sent > 0 ? new Date() : null,
+        sentCount: result.sent,
+        failedCount: result.failed,
       })
       .where(eq(scheduledNotificationsTable.id, campaign.id));
 
