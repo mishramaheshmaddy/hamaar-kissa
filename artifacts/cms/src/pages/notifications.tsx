@@ -746,6 +746,10 @@ export default function Notifications() {
                 </table>
               </div>
 
+              <p className="text-xs text-muted-foreground mt-3">
+                Open Rate = Unique Opens ÷ Sent. “Opened” total tap events बा; “Unique Opens” अलग-अलग device/user के हिसाब से गिनल जाला.
+              </p>
+
               {history.length > historyLimit && (
                 <div className="flex justify-center pt-4">
                   <Button
