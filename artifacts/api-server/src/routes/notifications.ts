@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
   pushTokensTable,
@@ -99,6 +99,7 @@ router.get("/admin/notifications/scheduled", requireAdmin, async (_req, res) => 
           .select({
             contentId: analyticsEventsTable.contentId,
             openedCount: count(),
+            uniqueOpenCount: countDistinct(analyticsEventsTable.deviceId),
           })
           .from(analyticsEventsTable)
           .where(
@@ -111,14 +112,21 @@ router.get("/admin/notifications/scheduled", requireAdmin, async (_req, res) => 
           .groupBy(analyticsEventsTable.contentId)
       : [];
 
-    const openedByNotificationId = new Map(
-      openRows.map((row) => [Number(row.contentId), Number(row.openedCount)]),
+    const openStatsByNotificationId = new Map(
+      openRows.map((row) => [
+        Number(row.contentId),
+        {
+          openedCount: Number(row.openedCount),
+          uniqueOpenCount: Number(row.uniqueOpenCount),
+        },
+      ]),
     );
 
     res.json(
       rows.map((row) => ({
         ...row,
-        openedCount: openedByNotificationId.get(row.id) ?? 0,
+        openedCount: openStatsByNotificationId.get(row.id)?.openedCount ?? 0,
+        uniqueOpenCount: openStatsByNotificationId.get(row.id)?.uniqueOpenCount ?? 0,
       })),
     );
   } catch (e) {
@@ -188,6 +196,8 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => 
       .set({
         status: result.sent > 0 ? "sent" : "failed",
         sentAt: result.sent > 0 ? new Date() : null,
+        sentCount: result.sent,
+        failedCount: result.failed,
       })
       .where(eq(scheduledNotificationsTable.id, record.id));
 
