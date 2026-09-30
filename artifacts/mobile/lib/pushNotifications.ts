@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import messaging from "@react-native-firebase/messaging";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
-import { BASE } from "./api";
+import { BASE, trackEvent } from "./api";
 
 export interface NotificationPrefs {
   master: boolean;
@@ -190,6 +190,7 @@ async function presentForegroundNotification(remoteMessage: any): Promise<void> 
         data: {
           type: data.type ?? "",
           id: data.id ?? "",
+          notificationId: data.notificationId ?? "",
         },
         sound: "default",
       },
@@ -219,13 +220,36 @@ async function presentForegroundNotification(remoteMessage: any): Promise<void> 
 export function setupNotificationOpenHandler(
   onOpen: (type: string, id: string) => void,
 ): () => void {
+  // A notification tap can surface through more than one callback on a
+  // cold/foreground transition. Keep one open event per campaign per
+  // app session so CMS counts are not inflated by duplicate callbacks.
+  const openedNotificationIds = new Set<string>();
+
+  const recordNotificationOpen = (
+    type: string | undefined,
+    id: string | undefined,
+    notificationId: string | undefined,
+  ) => {
+    if (!type || !id) return;
+
+    if (notificationId && !openedNotificationIds.has(notificationId)) {
+      openedNotificationIds.add(notificationId);
+      trackEvent("notification_open", "notification", notificationId);
+    }
+
+    onOpen(String(type), String(id));
+  };
+
   const handleRemoteMessage = (remoteMessage: any) => {
     const type = remoteMessage?.data?.type;
     const id = remoteMessage?.data?.id;
+    const notificationId = remoteMessage?.data?.notificationId;
 
-    if (type && id) {
-      onOpen(String(type), String(id));
-    }
+    recordNotificationOpen(
+      type ? String(type) : undefined,
+      id ? String(id) : undefined,
+      notificationId ? String(notificationId) : undefined,
+    );
   };
 
   // Foreground FCM -> local notification.
@@ -246,11 +270,14 @@ export function setupNotificationOpenHandler(
       const data = response.notification.request.content.data as {
         type?: string;
         id?: string;
+        notificationId?: string;
       };
 
-      if (data?.type && data?.id) {
-        onOpen(String(data.type), String(data.id));
-      }
+      recordNotificationOpen(
+        data?.type,
+        data?.id,
+        data?.notificationId,
+      );
     });
 
   // Killed app notification tapped.
@@ -277,11 +304,14 @@ export function setupNotificationOpenHandler(
       const data = response.notification.request.content.data as {
         type?: string;
         id?: string;
+        notificationId?: string;
       };
 
-      if (data?.type && data?.id) {
-        onOpen(String(data.type), String(data.id));
-      }
+      recordNotificationOpen(
+        data?.type,
+        data?.id,
+        data?.notificationId,
+      );
     })
     .catch((e) => {
       console.error(
