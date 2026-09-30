@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { eq, desc } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
   pushTokensTable,
   notificationSettingsTable,
   scheduledNotificationsTable,
+  analyticsEventsTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
 import { sendPushToTokens, resolveTokensForPhones, resolveContentImageUrl } from "../lib/push";
@@ -91,7 +92,35 @@ router.get("/admin/notifications/scheduled", requireAdmin, async (_req, res) => 
       .from(scheduledNotificationsTable)
       .orderBy(desc(scheduledNotificationsTable.scheduledAt))
       .limit(50);
-    res.json(rows);
+
+    const ids = rows.map((row) => row.id);
+    const openRows = ids.length
+      ? await db
+          .select({
+            contentId: analyticsEventsTable.contentId,
+            openedCount: count(),
+          })
+          .from(analyticsEventsTable)
+          .where(
+            and(
+              eq(analyticsEventsTable.eventType, "notification_open"),
+              eq(analyticsEventsTable.contentType, "notification"),
+              inArray(analyticsEventsTable.contentId, ids),
+            ),
+          )
+          .groupBy(analyticsEventsTable.contentId)
+      : [];
+
+    const openedByNotificationId = new Map(
+      openRows.map((row) => [Number(row.contentId), Number(row.openedCount)]),
+    );
+
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        openedCount: openedByNotificationId.get(row.id) ?? 0,
+      })),
+    );
   } catch (e) {
     console.error("GET /admin/notifications/scheduled error:", e);
     res.status(500).json({ error: "Failed to load notifications" });
@@ -127,11 +156,6 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => 
       tokens = rows.map((r) => r.token);
     }
 
-    const imageUrl = await resolveContentImageUrl(contentType, contentId);
-    const result = tokens.length
-      ? await sendPushToTokens(tokens, title.trim(), body.trim(), buildDeepLinkData(contentType, contentId), imageUrl)
-      : { sent: 0, failed: 0 };
-
     const [record] = await db
       .insert(scheduledNotificationsTable)
       .values({
@@ -141,12 +165,39 @@ router.post("/admin/notifications/broadcast", requireAdmin, async (req, res) => 
         contentId: contentId ?? null,
         targetPhones: phones && phones.length > 0 ? JSON.stringify(phones) : null,
         scheduledAt: new Date(),
-        status: "sent",
-        sentAt: new Date(),
+        status: "pending",
       })
       .returning();
 
-    res.json({ ok: true, recipients: tokens.length, matched, unmatched, ...result, record });
+    const imageUrl = await resolveContentImageUrl(contentType, contentId);
+    const result = tokens.length
+      ? await sendPushToTokens(
+          tokens,
+          title.trim(),
+          body.trim(),
+          {
+            ...(buildDeepLinkData(contentType, contentId) ?? {}),
+            notificationId: String(record.id),
+          },
+          imageUrl,
+        )
+      : { sent: 0, failed: 0 };
+
+    await db
+      .update(scheduledNotificationsTable)
+      .set({
+        status: result.sent > 0 ? "sent" : "failed",
+        sentAt: result.sent > 0 ? new Date() : null,
+      })
+      .where(eq(scheduledNotificationsTable.id, record.id));
+
+    const finalRecord = {
+      ...record,
+      status: result.sent > 0 ? "sent" : "failed",
+      sentAt: result.sent > 0 ? new Date() : null,
+    };
+
+    res.json({ ok: true, recipients: tokens.length, matched, unmatched, ...result, record: finalRecord });
   } catch (e) {
     console.error("POST /admin/notifications/broadcast error:", e);
     res.status(500).json({ error: "Failed to send broadcast" });
