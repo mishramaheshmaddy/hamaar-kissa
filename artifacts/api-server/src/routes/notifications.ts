@@ -8,7 +8,9 @@ import {
   analyticsEventsTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
-import { sendPushToTokens, resolveTokensForPhones, resolveContentImageUrl } from "../lib/push";
+import { verifyUserToken } from "./userAuth";
+import { usersTable } from "@workspace/db";
+import { sendPushToTokens, resolveTokensForPhones, resolveContentImageUrl, normalizePhone } from "../lib/push";
 
 const router = Router();
 
@@ -16,6 +18,75 @@ function buildDeepLinkData(contentType?: string | null, contentId?: number | nul
   if (!contentType || !contentId) return undefined;
   return { type: contentType, id: String(contentId) };
 }
+
+
+// ---------------------------------------------------------------------
+// Mobile notification history — only notifications sent in the last 30 days.
+// Global notifications are visible to everyone; phone-targeted notifications
+// are visible only to the matching logged-in account.
+// ---------------------------------------------------------------------
+router.get("/notifications/history", async (req, res) => {
+  try {
+    let userPhone: string | null = null;
+    const auth = req.headers.authorization;
+
+    if (auth?.startsWith("Bearer ")) {
+      const decoded = verifyUserToken(auth.slice(7));
+      if (decoded) {
+        const [user] = await db
+          .select({ phone: usersTable.phone })
+          .from(usersTable)
+          .where(eq(usersTable.id, decoded.userId))
+          .limit(1);
+        userPhone = user?.phone ?? null;
+      }
+    }
+
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const rows = await db
+      .select({
+        id: scheduledNotificationsTable.id,
+        title: scheduledNotificationsTable.title,
+        body: scheduledNotificationsTable.body,
+        contentType: scheduledNotificationsTable.contentType,
+        contentId: scheduledNotificationsTable.contentId,
+        scheduledAt: scheduledNotificationsTable.scheduledAt,
+        sentAt: scheduledNotificationsTable.sentAt,
+        targetPhones: scheduledNotificationsTable.targetPhones,
+      })
+      .from(scheduledNotificationsTable)
+      .where(
+        and(
+          eq(scheduledNotificationsTable.status, "sent"),
+          sql`${scheduledNotificationsTable.scheduledAt} >= ${cutoff}`,
+        ),
+      )
+      .orderBy(desc(scheduledNotificationsTable.scheduledAt));
+
+    const visible = rows.filter((row) => {
+      if (!row.targetPhones) return true;
+      if (!userPhone) return false;
+
+      try {
+        const targets = JSON.parse(row.targetPhones) as unknown;
+        if (!Array.isArray(targets)) return false;
+        return targets.some(
+          (target) => typeof target === "string" && normalizePhone(target) === userPhone,
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    res.json(
+      visible.map(({ targetPhones: _targetPhones, ...row }) => row),
+    );
+  } catch (e) {
+    console.error("GET /notifications/history error:", e);
+    res.status(500).json({ error: "Failed to load notification history" });
+  }
+});
 
 // ---------------------------------------------------------------------
 // Daily cycle (recurring, at most once every 24h while enabled)
