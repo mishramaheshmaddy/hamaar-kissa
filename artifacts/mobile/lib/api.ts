@@ -157,8 +157,19 @@ export async function apiFetch<T>(path: string): Promise<T> {
 // a flaky network or a slow/down analytics endpoint should never be
 // visible to someone listening to a story or watching a video.
 // ---------------------------------------------------------------------
-export type AnalyticsEventType = "story_play" | "video_play" | "download" | "like" | "like_removed" | "save" | "save_removed" | "share";
+export type AnalyticsEventType = "story_play" | "video_play" | "download" | "like" | "like_removed" | "save" | "save_removed" | "share" | "notification_open";
 export type AnalyticsContentType = "story" | "video" | "notification";
+
+const ANALYTICS_DEVICE_ID_KEY = "analytics_device_id";
+
+async function getAnalyticsDeviceId(): Promise<string> {
+  const existing = await AsyncStorage.getItem(ANALYTICS_DEVICE_ID_KEY);
+  if (existing) return existing;
+
+  const created = `device_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`;
+  await AsyncStorage.setItem(ANALYTICS_DEVICE_ID_KEY, created);
+  return created;
+}
 
 export function trackEvent(
   eventType: AnalyticsEventType,
@@ -167,7 +178,10 @@ export function trackEvent(
 ): void {
   (async () => {
     try {
-      const token = await AsyncStorage.getItem("hk_token");
+      const [token, deviceId] = await Promise.all([
+        AsyncStorage.getItem("hk_token"),
+        getAnalyticsDeviceId(),
+      ]);
 
       await fetch(`${BASE}/api/analytics`, {
         method: "POST",
@@ -175,13 +189,14 @@ export function trackEvent(
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ eventType, contentType, contentId }),
+        body: JSON.stringify({ eventType, contentType, contentId, deviceId }),
       });
     } catch {
       // Fire-and-forget — never surface analytics failures to the user.
     }
   })();
 }
+
 // ---------------------------------------------------------------------
 // Playlist API
 // ---------------------------------------------------------------------
