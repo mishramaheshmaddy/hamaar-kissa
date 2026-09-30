@@ -14,10 +14,13 @@ export const analyticsEventsTable = pgTable(
     // client fires events fire-and-forget regardless of auth state.
     userId: integer("user_id"),
     eventType: text("event_type").notNull(),
-    // "story" | "video" — nullable since not every future event type will
-    // necessarily be tied to a piece of content.
+    // "story" | "video" | "notification" — nullable since not every
+    // future event type will necessarily be tied to a piece of content.
     contentType: text("content_type"),
     contentId: integer("content_id"),
+    // Anonymous app-install/device identifier. Used for unique notification
+    // opens without requiring the user to be logged in or exposing PII.
+    deviceId: text("device_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
