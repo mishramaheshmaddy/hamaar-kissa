@@ -137,6 +137,26 @@ export default function NotificationsScreen() {
             </View>
           </>
         )}
+
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>आईल सूचना</Text>
+        <TouchableOpacity
+          onPress={() => router.push("/settings/notification-history" as any)}
+          activeOpacity={0.8}
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        >
+          <View style={styles.row}>
+            <View style={[styles.iconBox, { backgroundColor: "#FF6B0020" }]}>
+              <Text style={{ fontSize: 20 }}>📬</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>आईल सूचना</Text>
+              <Text style={[styles.rowDesc, { color: colors.mutedForeground }]}>
+                पिछला 30 दिन के सूचना देखीं
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+          </View>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
