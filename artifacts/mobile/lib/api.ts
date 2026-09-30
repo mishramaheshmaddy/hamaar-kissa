@@ -150,6 +150,34 @@ export async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface ApiNotificationHistoryItem {
+  id: number;
+  title: string;
+  body: string;
+  contentType: "audio" | "video" | null;
+  contentId: number | null;
+  scheduledAt: string;
+  sentAt: string | null;
+}
+
+export async function getNotificationHistory(): Promise<ApiNotificationHistoryItem[]> {
+  const token = await AsyncStorage.getItem("hk_token");
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE}/api/notifications/history`, { headers });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}`);
+  }
+
+  const contentType = res.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    throw new Error("API returned non-JSON");
+  }
+
+  return res.json() as Promise<ApiNotificationHistoryItem[]>;
+}
+
 // ---------------------------------------------------------------------
 // Analytics event tracking (Phase 2) — story_play / video_play /
 // download / like / save. Deliberately fire-and-forget: callers should
