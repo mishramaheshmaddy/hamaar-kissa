@@ -158,7 +158,7 @@ export async function apiFetch<T>(path: string): Promise<T> {
 // visible to someone listening to a story or watching a video.
 // ---------------------------------------------------------------------
 export type AnalyticsEventType = "story_play" | "video_play" | "download" | "like" | "like_removed" | "save" | "save_removed" | "share";
-export type AnalyticsContentType = "story" | "video";
+export type AnalyticsContentType = "story" | "video" | "notification";
 
 export function trackEvent(
   eventType: AnalyticsEventType,
