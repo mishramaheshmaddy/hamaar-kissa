@@ -177,7 +177,7 @@ router.get("/analytics/story/:id", async (req, res) => {
 
 router.post("/analytics", async (req, res) => {
   try {
-    const { eventType, contentType, contentId } = req.body as {
+    const { eventType, contentType, contentId, deviceId } = req.body as {
       eventType?: string;
       contentType?: string | null;
       contentId?: number | string | null;
