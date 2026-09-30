@@ -6,10 +6,10 @@ import {
   notificationSettingsTable,
   scheduledNotificationsTable,
   analyticsEventsTable,
+  usersTable,
 } from "@workspace/db";
 import { requireAdmin } from "./auth";
 import { verifyUserToken } from "./userAuth";
-import { usersTable } from "@workspace/db";
 import { sendPushToTokens, resolveTokensForPhones, resolveContentImageUrl, normalizePhone } from "../lib/push";
 
 const router = Router();
@@ -59,7 +59,7 @@ router.get("/notifications/history", async (req, res) => {
       .where(
         and(
           eq(scheduledNotificationsTable.status, "sent"),
-          sql`${scheduledNotificationsTable.scheduledAt} >= ${cutoff}`,
+          sql`coalesce(${scheduledNotificationsTable.sentAt}, ${scheduledNotificationsTable.scheduledAt}) >= ${cutoff}`,
         ),
       )
       .orderBy(desc(scheduledNotificationsTable.scheduledAt));
