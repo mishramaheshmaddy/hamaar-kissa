@@ -27,7 +27,7 @@ function daysAgo(n: number): Date {
 // Phase 2 event types the mobile app is allowed to send. Kept as a fixed
 // list (rather than accepting anything the client sends) so a typo or a
 // future ad-hoc event on the client can't silently pollute the table.
-const ANALYTICS_EVENT_TYPES = ["story_play", "video_play", "download", "like", "like_removed", "save", "save_removed", "share"] as const;
+const ANALYTICS_EVENT_TYPES = ["story_play", "video_play", "download", "like", "like_removed", "save", "save_removed", "share", "notification_open"] as const;
 type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
 
 function isAnalyticsEventType(v: unknown): v is AnalyticsEventType {
@@ -181,6 +181,7 @@ router.post("/analytics", async (req, res) => {
       eventType?: string;
       contentType?: string | null;
       contentId?: number | string | null;
+      deviceId?: string | null;
     };
 
     if (!isAnalyticsEventType(eventType)) {
@@ -207,6 +208,11 @@ router.post("/analytics", async (req, res) => {
       normalizedContentId = n;
     }
 
+    const normalizedDeviceId =
+      typeof deviceId === "string" && deviceId.trim()
+        ? deviceId.trim().slice(0, 128)
+        : null;
+
     // Optional — logged-in users get attributed, guests don't.
     let userId: number | null = null;
     const auth = req.headers.authorization;
@@ -220,6 +226,7 @@ router.post("/analytics", async (req, res) => {
       eventType,
       contentType: normalizedContentType,
       contentId: normalizedContentId,
+      deviceId: normalizedDeviceId,
     });
 
     res.status(201).json({ ok: true });
