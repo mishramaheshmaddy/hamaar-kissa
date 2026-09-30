@@ -37,15 +37,40 @@ async function runDailyCycleCheck() {
 
   const tokens = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
   if (tokens.length > 0) {
+    const [campaign] = await db
+      .insert(scheduledNotificationsTable)
+      .values({
+        title: settings.dailyCycleTitle,
+        body: settings.dailyCycleBody,
+        contentType: settings.dailyCycleContentType,
+        contentId: settings.dailyCycleContentId,
+        targetPhones: null,
+        scheduledAt: new Date(),
+        status: "pending",
+      })
+      .returning({ id: scheduledNotificationsTable.id });
+
     const imageUrl = await resolveContentImageUrl(settings.dailyCycleContentType, settings.dailyCycleContentId);
     const result = await sendPushToTokens(
       tokens.map((t) => t.token),
       settings.dailyCycleTitle,
       settings.dailyCycleBody,
-      buildDeepLinkData(settings.dailyCycleContentType, settings.dailyCycleContentId),
+      {
+        ...(buildDeepLinkData(settings.dailyCycleContentType, settings.dailyCycleContentId) ?? {}),
+        notificationId: String(campaign.id),
+      },
       imageUrl,
     );
-    logger.info({ ...result }, "Daily cycle notification sent");
+
+    await db
+      .update(scheduledNotificationsTable)
+      .set({
+        status: result.sent > 0 ? "sent" : "failed",
+        sentAt: result.sent > 0 ? new Date() : null,
+      })
+      .where(eq(scheduledNotificationsTable.id, campaign.id));
+
+    logger.info({ ...result, notificationId: campaign.id }, "Daily cycle notification sent");
   }
 
   await db
@@ -82,7 +107,10 @@ async function runScheduledCheck() {
           tokens,
           item.title,
           item.body,
-          buildDeepLinkData(item.contentType, item.contentId),
+          {
+            ...(buildDeepLinkData(item.contentType, item.contentId) ?? {}),
+            notificationId: String(item.id),
+          },
           imageUrl,
         );
       }
