@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, count, countDistinct, desc, eq, inArray } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   pushTokensTable,
@@ -99,7 +99,11 @@ router.get("/admin/notifications/scheduled", requireAdmin, async (_req, res) => 
           .select({
             contentId: analyticsEventsTable.contentId,
             openedCount: count(),
-            uniqueOpenCount: countDistinct(analyticsEventsTable.deviceId),
+            // Newer clients send an anonymous device ID. Older clients may
+            // only have a verified login, so use userId as the fallback.
+            uniqueOpenCount: countDistinct(
+              sql<string>`coalesce(${analyticsEventsTable.deviceId}, 'user:' || ${analyticsEventsTable.userId}::text)`,
+            ),
           })
           .from(analyticsEventsTable)
           .where(
