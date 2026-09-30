@@ -232,12 +232,28 @@ export function setupNotificationOpenHandler(
   ) => {
     if (!type || !id) return;
 
-    if (notificationId && !openedNotificationIds.has(notificationId)) {
-      openedNotificationIds.add(notificationId);
-      trackEvent("notification_open", "notification", notificationId);
+    onOpen(String(type), String(id));
+
+    if (!notificationId || openedNotificationIds.has(notificationId)) {
+      return;
     }
 
-    onOpen(String(type), String(id));
+    openedNotificationIds.add(notificationId);
+
+    // getLastNotificationResponseAsync() can return the last response again
+    // after an app restart. Persist the most recently counted campaign so
+    // that reopening the app does not count the same tap again.
+    void AsyncStorage.getItem("last_notification_open_id")
+      .then((lastOpenedId) => {
+        if (lastOpenedId === notificationId) return;
+
+        trackEvent("notification_open", "notification", notificationId);
+        return AsyncStorage.setItem("last_notification_open_id", notificationId);
+      })
+      .catch(() => {
+        // Tracking is best-effort and must never block notification navigation.
+        trackEvent("notification_open", "notification", notificationId);
+      });
   };
 
   const handleRemoteMessage = (remoteMessage: any) => {
