@@ -39,7 +39,10 @@ interface ScheduledItem {
   scheduledAt: string;
   status: "pending" | "sent" | "cancelled" | "failed";
   sentAt: string | null;
+  sentCount: number;
+  failedCount: number;
   openedCount: number;
+  uniqueOpenCount: number;
 }
 
 // Shared "attach content" picker: type select (none/audio/video), then a
@@ -416,6 +419,7 @@ export default function Notifications() {
   const [scheduleTime, setScheduleTime] = useState("");
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState<ScheduledItem[]>([]);
+  const [historyLimit, setHistoryLimit] = useState(10);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   const loadHistory = async () => {
@@ -423,6 +427,7 @@ export default function Notifications() {
     try {
       const res = await fetch("/api/admin/notifications/scheduled", { credentials: "include" });
       setHistory(await res.json());
+      setHistoryLimit(10);
     } catch {
       // non-critical, silently ignore
     } finally {
@@ -648,45 +653,110 @@ export default function Notifications() {
         </CardContent>
       </Card>
 
-      {/* History */}
+      {/* Notification analytics history */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">History</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Notification History</CardTitle>
+              <CardDescription>
+                हर push के delivery, opens आ open rate के आंकड़ा
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadHistory}
+              disabled={loadingHistory}
+              className="gap-2"
+            >
+              <RefreshCcw className={`w-3.5 h-3.5 ${loadingHistory ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingHistory ? (
-            <div className="py-4 flex justify-center">
+            <div className="py-8 flex justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : history.length === 0 ? (
             <p className="text-sm text-muted-foreground">अबहीं तक कवनो notification नइखे भेजल गइल।</p>
           ) : (
-            <div className="divide-y">
-              {history.map((item) => {
-                const phoneCount = item.targetPhones ? (JSON.parse(item.targetPhones) as string[]).length : 0;
-                return (
-                  <div key={item.id} className="py-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{item.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{item.body}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {item.status === "sent" && `भेजल गइल — ${new Date(item.sentAt!).toLocaleString()}`}
-                        {item.status === "pending" && `शेड्यूल्ड — ${new Date(item.scheduledAt).toLocaleString()}`}
-                        {item.status === "cancelled" && "रद्द कर दिहल गइल"}
-                        {item.status === "failed" && "फेल भइल"}
-                        {phoneCount > 0 && ` • ${phoneCount} खास नंबर पर`}
-                        {item.openedCount > 0 && ` • 👁 ${item.openedCount} खोलल गइल`}
-                      </p>
-                    </div>
-                    {item.status === "pending" && (
-                      <Button variant="ghost" size="icon" onClick={() => cancelScheduled(item.id)}>
-                        <X className="w-4 h-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-[900px] text-sm">
+                  <thead>
+                    <tr className="bg-orange-100/70 border-b">
+                      <th className="px-3 py-3 text-left font-semibold">Push Notification</th>
+                      <th className="px-3 py-3 text-left font-semibold">Date</th>
+                      <th className="px-3 py-3 text-center font-semibold">Sent</th>
+                      <th className="px-3 py-3 text-center font-semibold">Failed</th>
+                      <th className="px-3 py-3 text-center font-semibold">Opened</th>
+                      <th className="px-3 py-3 text-center font-semibold">Unique Opens</th>
+                      <th className="px-3 py-3 text-center font-semibold">Open Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {history.slice(0, historyLimit).map((item) => {
+                      const displayDate = item.sentAt || item.scheduledAt;
+                      const openRate =
+                        item.sentCount > 0
+                          ? Math.min(100, (item.uniqueOpenCount / item.sentCount) * 100)
+                          : 0;
+
+                      return (
+                        <tr key={item.id} className="hover:bg-muted/30">
+                          <td className="px-3 py-3 align-top">
+                            <div className="font-medium">{item.title}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5 max-w-[300px] truncate">
+                              {item.body}
+                            </div>
+                            {item.targetPhones && (
+                              <div className="text-[11px] text-muted-foreground mt-1">
+                                खास नंबर
+                              </div>
+                            )}
+                            {item.status === "pending" && (
+                              <div className="text-[11px] text-amber-600 mt-1">Scheduled</div>
+                            )}
+                            {item.status === "cancelled" && (
+                              <div className="text-[11px] text-muted-foreground mt-1">Cancelled</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 align-top whitespace-nowrap text-muted-foreground">
+                            {new Date(displayDate).toLocaleDateString("en-IN", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </td>
+                          <td className="px-3 py-3 text-center font-semibold">{item.sentCount}</td>
+                          <td className="px-3 py-3 text-center">{item.failedCount}</td>
+                          <td className="px-3 py-3 text-center">{item.openedCount}</td>
+                          <td className="px-3 py-3 text-center">{item.uniqueOpenCount}</td>
+                          <td className="px-3 py-3 text-center font-semibold">
+                            {item.sentCount > 0 ? `${openRate.toFixed(2)}%` : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {history.length > historyLimit && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setHistoryLimit((n) => Math.min(n + 10, history.length))}
+                  >
+                    See More
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
