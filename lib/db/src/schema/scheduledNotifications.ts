@@ -16,6 +16,8 @@ export const scheduledNotificationsTable = pgTable("scheduled_notifications", {
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("pending"), // pending | sent | cancelled | failed
   sentAt: timestamp("sent_at", { withTimezone: true }),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
