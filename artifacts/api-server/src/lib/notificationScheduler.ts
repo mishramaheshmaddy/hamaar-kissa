@@ -67,6 +67,8 @@ async function runDailyCycleCheck() {
       .set({
         status: result.sent > 0 ? "sent" : "failed",
         sentAt: result.sent > 0 ? new Date() : null,
+        sentCount: result.sent,
+        failedCount: result.failed,
       })
       .where(eq(scheduledNotificationsTable.id, campaign.id));
 
@@ -101,9 +103,10 @@ async function runScheduledCheck() {
         const rows = await db.select({ token: pushTokensTable.token }).from(pushTokensTable);
         tokens = rows.map((r) => r.token);
       }
+      let result = { sent: 0, failed: 0 };
       if (tokens.length > 0) {
         const imageUrl = await resolveContentImageUrl(item.contentType, item.contentId);
-        await sendPushToTokens(
+        result = await sendPushToTokens(
           tokens,
           item.title,
           item.body,
@@ -116,7 +119,12 @@ async function runScheduledCheck() {
       }
       await db
         .update(scheduledNotificationsTable)
-        .set({ status: "sent", sentAt: new Date() })
+        .set({
+          status: result.sent > 0 ? "sent" : "failed",
+          sentAt: result.sent > 0 ? new Date() : null,
+          sentCount: result.sent,
+          failedCount: result.failed,
+        })
         .where(eq(scheduledNotificationsTable.id, item.id));
     } catch (e) {
       logger.error({ err: e, id: item.id }, "Scheduled notification failed to send");
