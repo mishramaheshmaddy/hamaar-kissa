@@ -39,6 +39,7 @@ interface ScheduledItem {
   scheduledAt: string;
   status: "pending" | "sent" | "cancelled" | "failed";
   sentAt: string | null;
+  openedCount: number;
 }
 
 // Shared "attach content" picker: type select (none/audio/video), then a
@@ -674,6 +675,7 @@ export default function Notifications() {
                         {item.status === "cancelled" && "रद्द कर दिहल गइल"}
                         {item.status === "failed" && "फेल भइल"}
                         {phoneCount > 0 && ` • ${phoneCount} खास नंबर पर`}
+                        {item.openedCount > 0 && ` • 👁 ${item.openedCount} खोलल गइल`}
                       </p>
                     </div>
                     {item.status === "pending" && (
