@@ -1,4 +1,4 @@
-import { db, pushTokensTable, audioStoriesTable, videosTable, contentPublishEventsTable } from "@workspace/db";
+import { db, pushTokensTable, audioStoriesTable, videosTable, contentPublishEventsTable, scheduledNotificationsTable } from "@workspace/db";
 import { inArray, isNotNull, eq, count } from "drizzle-orm";
 import { logger } from "./logger";
 
@@ -232,13 +232,38 @@ export async function maybeNotifyNewContent(
         ? `हमार किस्सा में आ गईल नया कहानी, ${title}, क्लिक करी आ अभीयें सुनी`
         : `हमार किस्सा में आ गईल नया Video, क्लिक करी आ अभीयें देखि`;
 
+    const [campaign] = await db
+      .insert(scheduledNotificationsTable)
+      .values({
+        title: "हमार किस्सा",
+        body,
+        contentType,
+        contentId,
+        targetPhones: null,
+        scheduledAt: new Date(),
+        status: "pending",
+      })
+      .returning({ id: scheduledNotificationsTable.id });
+
     const result = await sendPushToTokens(
       tokens,
       "हमार किस्सा",
       body,
-      { type: contentType, id: String(contentId) },
+      {
+        type: contentType,
+        id: String(contentId),
+        notificationId: String(campaign.id),
+      },
       thumbnailUrl ?? undefined,
     );
+
+    await db
+      .update(scheduledNotificationsTable)
+      .set({
+        status: result.sent > 0 ? "sent" : "failed",
+        sentAt: result.sent > 0 ? new Date() : null,
+      })
+      .where(eq(scheduledNotificationsTable.id, campaign.id));
 
     logger.info(
   {
@@ -248,6 +273,7 @@ export async function maybeNotifyNewContent(
     eligibleTokens: tokens.length,
     sent: result.sent,
     failed: result.failed,
+    notificationId: campaign.id,
   },
   "new-content push notification completed",
 );
