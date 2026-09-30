@@ -36,7 +36,7 @@ function isAnalyticsEventType(v: unknown): v is AnalyticsEventType {
 
 // content_type is deliberately open-ended at the schema level, but Phase 2
 // only ever produces these two.
-const ANALYTICS_CONTENT_TYPES = ["story", "video"] as const;
+const ANALYTICS_CONTENT_TYPES = ["story", "video", "notification"] as const;
 type AnalyticsContentType = (typeof ANALYTICS_CONTENT_TYPES)[number];
 
 function isAnalyticsContentType(v: unknown): v is AnalyticsContentType {
