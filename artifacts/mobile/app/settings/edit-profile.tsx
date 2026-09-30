@@ -337,13 +337,13 @@ useEffect(()=>{
         </Text>
       </TouchableOpacity>
 
-      <Text style={styles.label}>राउर पूरा नाम</Text>
-      <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
+      <Text style={[styles.label,{color:colors.foreground}]}>राउर पूरा नाम</Text>
+      <TextInput style={[styles.input,{color:colors.foreground,borderColor:colors.border}]} value={fullName} onChangeText={setFullName} placeholderTextColor={colors.hint} />
 
-      <Text style={styles.label}>Username</Text>
+      <Text style={[styles.label,{color:colors.foreground}]}>Username</Text>
       <>
 <TextInput
-style={styles.input}
+style={[styles.input,{color:colors.foreground,borderColor:colors.border}]}
 value={username}
 onChangeText={(value)=>{
 const clean=value
@@ -386,33 +386,34 @@ color:usernameAvailable ? "green" : "#d32f2f"
 
 </>
 
-      <Text style={styles.label}>जन्म तिथि</Text>
+      <Text style={[styles.label,{color:colors.foreground}]}>जन्म तिथि</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input,{color:colors.foreground,borderColor:colors.border}]}
         placeholder="DD / MM / YYYY"
+        placeholderTextColor={colors.hint}
         value={dob}
         onChangeText={setDob}
       />
 
-      <Text style={styles.label}>उम्र</Text>
+      <Text style={[styles.label,{color:colors.foreground}]}>उम्र</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input,{color:colors.foreground,borderColor:colors.border}]}
         keyboardType="numeric"
         value={age}
         onChangeText={setAge}
       />
 
-      <Text style={styles.label}>मोबाइल</Text>
+      <Text style={[styles.label,{color:colors.foreground}]}>मोबाइल</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input,{color:colors.foreground,borderColor:colors.border}]}
         value={mobile}
         onChangeText={setMobile}
         editable={user?.authProvider!=="phone"}
       />
 
-      <Text style={styles.label}>ईमेल</Text>
+      <Text style={[styles.label,{color:colors.foreground}]}>ईमेल</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input,{color:colors.foreground,borderColor:colors.border}]}
         value={email}
         onChangeText={setEmail}
         editable={user?.authProvider==="phone"}
